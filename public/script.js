@@ -119,7 +119,7 @@ function displayAIMessageStart() {
     messageDiv.id = 'current-ai-message';
     messageDiv.innerHTML = `
         <div class="message-avatar">
-            <img src="https://media.tenor.com/TKXDxD1BwkoAAAAM/middle-finger-cat.gif" alt="CatGPT" class="avatar-gif">
+            <img src="/images/catgpt-avatar.png" alt="CatGPT" class="avatar-gif">
         </div>
         <div class="message-content">
             <span class="streaming-cursor"></span>
@@ -142,7 +142,7 @@ function createWelcomeSection(subtitle = 'meow mrow meow meow? mrow!') {
         <div class="welcome-section">
             <div class="welcome-icon">
                 <div class="cat-logo">
-                    <img src="https://media.tenor.com/TKXDxD1BwkoAAAAM/middle-finger-cat.gif" alt="CatGPT Logo" class="cat-gif">
+                    <img src="/images/catgpt-avatar.png" alt="CatGPT Logo" class="cat-gif">
                 </div>
             </div>
             <h1 class="welcome-title">How can I help you today?</h1>
@@ -233,7 +233,7 @@ function displayCompletedAIMessage(content) {
     messageDiv.className = 'message ai';
     messageDiv.innerHTML = `
         <div class="message-avatar">
-            <img src="https://media.tenor.com/TKXDxD1BwkoAAAAM/middle-finger-cat.gif" alt="CatGPT" class="avatar-gif">
+            <img src="/images/catgpt-avatar.png" alt="CatGPT" class="avatar-gif">
         </div>
         <div class="message-content">
             ${escapeHtml(content)}
