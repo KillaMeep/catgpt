@@ -7,9 +7,6 @@ const sendBtn = document.getElementById('sendBtn');
 const messagesContainer = document.getElementById('messagesContainer');
 const chatHistory = document.getElementById('chatHistory');
 const newChatBtn = document.getElementById('newChatBtn');
-const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-const mobileOverlay = document.getElementById('mobileOverlay');
-const sidebar = document.querySelector('.sidebar');
 
 // State
 let conversationId = null;
@@ -38,22 +35,6 @@ sendBtn.addEventListener('click', sendMessage);
 
 // New chat button
 newChatBtn.addEventListener('click', startNewChat);
-
-// Mobile menu functionality
-if (mobileMenuBtn && mobileOverlay && sidebar) {
-    mobileMenuBtn.addEventListener('click', toggleMobileMenu);
-    mobileOverlay.addEventListener('click', closeMobileMenu);
-    
-    // Close mobile menu when clicking on a chat item
-    chatHistory.addEventListener('click', (e) => {
-        if (e.target.classList.contains('chat-item')) {
-            closeMobileMenu();
-        }
-    });
-    
-    // Close mobile menu when starting a new chat
-    newChatBtn.addEventListener('click', closeMobileMenu);
-}
 
 socket.on('conversation-history', (messages) => {
     displayConversationHistory(messages);
@@ -138,7 +119,7 @@ function displayAIMessageStart() {
     messageDiv.id = 'current-ai-message';
     messageDiv.innerHTML = `
         <div class="message-avatar">
-            <img src="/images/catgpt-avatar.png" alt="CatGPT" class="avatar-gif">
+            <img src="https://media.tenor.com/TKXDxD1BwkoAAAAM/middle-finger-cat.gif" alt="CatGPT" class="avatar-gif">
         </div>
         <div class="message-content">
             <span class="streaming-cursor"></span>
@@ -161,7 +142,7 @@ function createWelcomeSection(subtitle = 'meow mrow meow meow? mrow!') {
         <div class="welcome-section">
             <div class="welcome-icon">
                 <div class="cat-logo">
-                    <img src="/images/catgpt-avatar.png" alt="CatGPT Logo" class="cat-gif">
+                    <img src="https://media.tenor.com/TKXDxD1BwkoAAAAM/middle-finger-cat.gif" alt="CatGPT Logo" class="cat-gif">
                 </div>
             </div>
             <h1 class="welcome-title">How can I help you today?</h1>
@@ -252,7 +233,7 @@ function displayCompletedAIMessage(content) {
     messageDiv.className = 'message ai';
     messageDiv.innerHTML = `
         <div class="message-avatar">
-            <img src="/images/catgpt-avatar.png" alt="CatGPT" class="avatar-gif">
+            <img src="https://media.tenor.com/TKXDxD1BwkoAAAAM/middle-finger-cat.gif" alt="CatGPT" class="avatar-gif">
         </div>
         <div class="message-content">
             ${escapeHtml(content)}
@@ -286,7 +267,14 @@ function startNewChat() {
 }
 
 function scrollToBottom() {
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    // Get the chat container which is the actual scrollable element
+    const chatContainer = document.querySelector('.chat-container');
+    if (chatContainer) {
+        // Use requestAnimationFrame to ensure DOM has updated before scrolling
+        requestAnimationFrame(() => {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        });
+    }
 }
 
 function escapeHtml(text) {
@@ -294,34 +282,6 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
-
-// Mobile menu functions
-function toggleMobileMenu() {
-    if (sidebar.classList.contains('open')) {
-        closeMobileMenu();
-    } else {
-        openMobileMenu();
-    }
-}
-
-function openMobileMenu() {
-    sidebar.classList.add('open');
-    mobileOverlay.classList.add('active');
-    document.body.style.overflow = 'hidden'; // Prevent background scrolling
-}
-
-function closeMobileMenu() {
-    sidebar.classList.remove('open');
-    mobileOverlay.classList.remove('active');
-    document.body.style.overflow = ''; // Restore scrolling
-}
-
-// Handle escape key to close mobile menu
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && sidebar && sidebar.classList.contains('open')) {
-        closeMobileMenu();
-    }
-});
 
 // Add some fun cat-themed responses for different times of day
 function getCatGreeting() {
