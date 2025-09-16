@@ -282,7 +282,7 @@ function generateMeowVariations(message, count) {
     
     // Expanded variety of cat sounds with different emotional contexts
     const standardSounds = ['meow', 'mrow', 'mrrow', 'mew', 'miau'];
-    const questionSounds = ['meow?', 'mrow?', 'mrrow?', 'mew?', 'nyaa?'];
+    const questionSounds = ['meow?', 'mrow?', 'mrrow?', 'mew?'];
     const excitedSounds = ['MEOW!', 'MROW!', 'meow!', 'mrow!', 'MEW!'];
     const contentSounds = ['purr', 'purrr', 'mrrrr', 'prrrr'];
     const playfulSounds = ['mrow', 'mrp', 'prr'];
