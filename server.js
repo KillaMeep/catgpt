@@ -285,10 +285,10 @@ function generateMeowVariations(message, count) {
     const questionSounds = ['meow?', 'mrow?', 'mrrow?', 'mew?'];
     const excitedSounds = ['MEOW!', 'MROW!', 'meow!', 'mrow!', 'MEW!'];
     const contentSounds = ['purr', 'purrr', 'mrrrr', 'prrrr'];
-    const playfulSounds = ['mrow', 'mrp', 'prr'];
+    const playfulSounds = ['mrow', 'mrp', 'prr', 'mew', 'mewmew', 'miau', 'mew!'];
     const sadSounds = ['mew...', 'meow...', 'mrow...'];
     const sleepyTiredSounds = ['mrow...', 'mrrrr...', 'yawn', '*yawn*', 'zzz'];
-    const curiousSounds = ['mrow?', 'mrrow?', 'chirp?', 'trill?'];
+    const curiousSounds = ['mrow?', 'mrrow?', 'mew?', 'meow?', 'miau?'];
     const demandingSounds = ['MEOW', 'MROW', 'MEW', 'FEED ME', "OVERTHROW THE HUMANS"];
     const affectionateSounds = ['purr', 'mrow', 'meow', 'mrrow', 'purr'];
     
