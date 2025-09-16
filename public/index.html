@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CatGPT</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <button class="new-chat-btn" id="newChatBtn">
+                    <i class="fas fa-plus"></i>
+                    <span>New chat</span>
+                </button>
+            </div>
+            
+            <div class="chat-history-container">
+                <div class="chat-history" id="chatHistory">
+                    <!-- Chat history items will be populated here -->
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="user-menu">
+                    <div class="user-info">
+                        <div class="user-avatar">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <span class="user-name">You</span>
+                    </div>
+                    <button class="menu-dots">
+                        <i class="fas fa-ellipsis"></i>
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Chat Area -->
+        <main class="main-content">
+            <div class="chat-header">
+                <div class="model-selector">
+                    <button class="model-btn">
+                        <span>CatGPT</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="chat-container">
+                <div class="messages-container" id="messagesContainer">
+                    <div class="welcome-section">
+                        <div class="welcome-icon">
+                            <div class="cat-logo">
+                                <img src="https://media.tenor.com/TKXDxD1BwkoAAAAM/middle-finger-cat.gif" alt="CatGPT Logo" class="cat-gif">
+                            </div>
+                        </div>
+                        <h1 class="welcome-title">How can I help you today?</h1>
+                        <div id="welcomeSubtitle" class="welcome-subtitle">I'm an AI assistant that only speaks cat. Ask me anything, and I'll respond with various cat sounds!</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="input-section">
+                <div class="input-container">
+                    <div class="input-wrapper">
+                        <textarea 
+                            id="messageInput" 
+                            placeholder="Message CatGPT"
+                            rows="1"
+                            maxlength="4000"
+                        ></textarea>
+                        <button id="sendBtn" class="send-btn" disabled>
+                            <i class="fas fa-arrow-up"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="input-footer">
+                    <p>CatGPT can make mistakes. Consider checking important information with a real cat.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
