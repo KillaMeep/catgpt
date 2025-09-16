@@ -9,6 +9,9 @@
 </head>
 <body>
     <div class="app-layout">
+        <!-- Mobile overlay for sidebar -->
+        <div class="mobile-overlay" id="mobileOverlay"></div>
+        
         <!-- Sidebar -->
         <nav class="sidebar">
             <div class="sidebar-header">
@@ -42,6 +45,9 @@
         <!-- Main Chat Area -->
         <main class="main-content">
             <div class="chat-header">
+                <button class="mobile-menu-btn" id="mobileMenuBtn">
+                    <i class="fas fa-bars"></i>
+                </button>
                 <div class="model-selector">
                     <button class="model-btn">
                         <span>CatGPT</span>

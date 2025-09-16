@@ -7,6 +7,9 @@ const sendBtn = document.getElementById('sendBtn');
 const messagesContainer = document.getElementById('messagesContainer');
 const chatHistory = document.getElementById('chatHistory');
 const newChatBtn = document.getElementById('newChatBtn');
+const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+const mobileOverlay = document.getElementById('mobileOverlay');
+const sidebar = document.querySelector('.sidebar');
 
 // State
 let conversationId = null;
@@ -35,6 +38,22 @@ sendBtn.addEventListener('click', sendMessage);
 
 // New chat button
 newChatBtn.addEventListener('click', startNewChat);
+
+// Mobile menu functionality
+if (mobileMenuBtn && mobileOverlay && sidebar) {
+    mobileMenuBtn.addEventListener('click', toggleMobileMenu);
+    mobileOverlay.addEventListener('click', closeMobileMenu);
+    
+    // Close mobile menu when clicking on a chat item
+    chatHistory.addEventListener('click', (e) => {
+        if (e.target.classList.contains('chat-item')) {
+            closeMobileMenu();
+        }
+    });
+    
+    // Close mobile menu when starting a new chat
+    newChatBtn.addEventListener('click', closeMobileMenu);
+}
 
 socket.on('conversation-history', (messages) => {
     displayConversationHistory(messages);
@@ -275,6 +294,34 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// Mobile menu functions
+function toggleMobileMenu() {
+    if (sidebar.classList.contains('open')) {
+        closeMobileMenu();
+    } else {
+        openMobileMenu();
+    }
+}
+
+function openMobileMenu() {
+    sidebar.classList.add('open');
+    mobileOverlay.classList.add('active');
+    document.body.style.overflow = 'hidden'; // Prevent background scrolling
+}
+
+function closeMobileMenu() {
+    sidebar.classList.remove('open');
+    mobileOverlay.classList.remove('active');
+    document.body.style.overflow = ''; // Restore scrolling
+}
+
+// Handle escape key to close mobile menu
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sidebar && sidebar.classList.contains('open')) {
+        closeMobileMenu();
+    }
+});
 
 // Add some fun cat-themed responses for different times of day
 function getCatGreeting() {

@@ -73,7 +73,7 @@ module.exports = defineConfig({
   webServer: {
     command: 'node server.js',
     url: 'http://localhost:7342',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     timeout: 120 * 1000,
   },
 });
