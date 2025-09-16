@@ -76,168 +76,380 @@ function generateMeowResponse(userMessage) {
     return catSounds;
 }
 
+// Helper functions for dynamic complexity analysis
+function detectSemanticComplexity(text) {
+    // Analyze semantic indicators of complexity
+    let semanticScore = 0;
+    
+    // Dependency/relationship words
+    const relationshipWords = ['because', 'therefore', 'however', 'moreover', 'furthermore', 'nevertheless', 'consequently', 'meanwhile', 'although', 'whereas'];
+    const relationshipCount = relationshipWords.filter(word => text.includes(word)).length;
+    semanticScore += relationshipCount * 3;
+    
+    // Abstract concept indicators
+    const abstractIndicators = ['concept', 'principle', 'theory', 'hypothesis', 'assumption', 'perspective', 'approach', 'methodology', 'framework'];
+    const abstractCount = abstractIndicators.filter(word => text.includes(word)).length;
+    semanticScore += abstractCount * 4;
+    
+    // Quantitative/measurement words
+    const quantitativeWords = ['percent', 'ratio', 'proportion', 'statistics', 'data', 'measurement', 'calculate', 'estimate', 'approximately'];
+    const quantitativeCount = quantitativeWords.filter(word => text.includes(word)).length;
+    semanticScore += quantitativeCount * 2;
+    
+    return { score: semanticScore, details: { relationshipCount, abstractCount, quantitativeCount } };
+}
+
+function analyzeTextStructure(text) {
+    // Analyze structural complexity
+    let structuralScore = 0;
+    
+    // Clause analysis (approximate)
+    const commaCount = (text.match(/,/g) || []).length;
+    const semicolonCount = (text.match(/;/g) || []).length;
+    const colonCount = (text.match(/:/g) || []).length;
+    
+    structuralScore += commaCount * 0.5; // Commas indicate complex clauses
+    structuralScore += semicolonCount * 2; // Semicolons indicate complex relationships
+    structuralScore += colonCount * 1.5; // Colons indicate explanations/lists
+    
+    // Parenthetical expressions
+    const parentheticalCount = (text.match(/\([^)]*\)/g) || []).length;
+    structuralScore += parentheticalCount * 2;
+    
+    // Quotation marks (indicating examples, references)
+    const quotationCount = (text.match(/["']/g) || []).length / 2; // Pairs of quotes
+    structuralScore += quotationCount * 1;
+    
+    return { score: structuralScore, details: { commaCount, semicolonCount, colonCount, parentheticalCount, quotationCount } };
+}
+
+function calculateDynamicCategoryBonus(matchedCategories, categoryMultipliers) {
+    // Bonus for combining multiple categories (interdisciplinary complexity)
+    if (matchedCategories.size <= 1) return 0;
+    
+    const categoryArray = Array.from(matchedCategories);
+    const avgMultiplier = categoryArray.reduce((sum, cat) => sum + (categoryMultipliers[cat] || 1.0), 0) / categoryArray.length;
+    const combinationBonus = Math.round((matchedCategories.size - 1) * 3 * avgMultiplier);
+    
+    return combinationBonus;
+}
+
+function adaptiveScoring(baseScore, textLength, categoryContext) {
+    // Adaptive scoring based on text length and context
+    let adaptiveMultiplier = 1.0;
+    
+    // Length-based adaptation
+    if (textLength > 100) adaptiveMultiplier += 0.1;
+    if (textLength > 200) adaptiveMultiplier += 0.1;
+    if (textLength > 300) adaptiveMultiplier += 0.1;
+    
+    // Context-based adaptation
+    const highComplexityCategories = ['academic', 'technical', 'analytical'];
+    const hasHighComplexityCategory = categoryContext.some(cat => highComplexityCategories.includes(cat));
+    if (hasHighComplexityCategory) adaptiveMultiplier += 0.05;
+    
+    return Math.round(baseScore * adaptiveMultiplier);
+}
+
+// Function to update complexity configuration dynamically
+function updateComplexityConfig(newConfig) {
+    // Merge new configuration with existing configuration
+    if (newConfig.scoring) {
+        Object.assign(COMPLEXITY_CONFIG.scoring, newConfig.scoring);
+    }
+    
+    if (newConfig.patterns) {
+        // Allow adding new patterns or updating existing ones
+        newConfig.patterns.forEach(newPattern => {
+            const existingIndex = COMPLEXITY_CONFIG.patterns.findIndex(p => p.type === newPattern.type);
+            if (existingIndex >= 0) {
+                COMPLEXITY_CONFIG.patterns[existingIndex] = { ...COMPLEXITY_CONFIG.patterns[existingIndex], ...newPattern };
+            } else {
+                COMPLEXITY_CONFIG.patterns.push(newPattern);
+            }
+        });
+    }
+    
+    if (newConfig.keywordCategories) {
+        Object.entries(newConfig.keywordCategories).forEach(([category, config]) => {
+            if (COMPLEXITY_CONFIG.keywordCategories[category]) {
+                // Merge existing category
+                COMPLEXITY_CONFIG.keywordCategories[category] = {
+                    ...COMPLEXITY_CONFIG.keywordCategories[category],
+                    ...config,
+                    words: [...(COMPLEXITY_CONFIG.keywordCategories[category].words || []), ...(config.words || [])]
+                };
+            } else {
+                // Add new category
+                COMPLEXITY_CONFIG.keywordCategories[category] = config;
+            }
+        });
+    }
+    
+    if (newConfig.categoryMultipliers) {
+        Object.assign(COMPLEXITY_CONFIG.categoryMultipliers, newConfig.categoryMultipliers);
+    }
+    
+    if (newConfig.reductionRules) {
+        Object.assign(COMPLEXITY_CONFIG.reductionRules, newConfig.reductionRules);
+    }
+    
+    if (newConfig.timeAdjustments) {
+        COMPLEXITY_CONFIG.timeAdjustments = newConfig.timeAdjustments;
+    }
+    
+    console.log('Complexity configuration updated');
+}
+
+// Export configuration for external access (if needed for testing or configuration)
+function getComplexityConfig() {
+    return JSON.parse(JSON.stringify(COMPLEXITY_CONFIG)); // Return deep copy
+}
+
+// Dynamic complexity analysis configuration
+const COMPLEXITY_CONFIG = {
+    // Base scoring parameters
+    scoring: {
+        lengthDivisor: 3,
+        maxLengthScore: 25,
+        questionMultiplier: 5,
+        exclamationMultiplier: 3,
+        sentenceMultiplier: 4,
+        complexWordMultiplier: 1.5,
+        complexWordThreshold: 5,
+        minScore: 2,
+        maxScore: 80
+    },
+    
+    // Pattern-based detection with dynamic scoring
+    patterns: [
+        { regex: /write (me )?a/, baseScore: 15, category: "creative", type: "Creative Writing" },
+        { regex: /create (me )?a/, baseScore: 15, category: "creative", type: "Creative Request" },
+        { regex: /compose a/, baseScore: 15, category: "creative", type: "Composition" },
+        { regex: /tell me about/, baseScore: 12, category: "informational", type: "Information Request" },
+        { regex: /explain (how|why|what|when|where)/, baseScore: 14, category: "educational", type: "Detailed Explanation" },
+        { regex: /how (do|to|can)/, baseScore: 12, category: "instructional", type: "Instructional" },
+        { regex: /what (is|are|would|should)/, baseScore: 10, category: "questioning", type: "Definition/Question" },
+        { regex: /give me (a|an|some)/, baseScore: 10, category: "requesting", type: "Request" },
+        { regex: /show me/, baseScore: 10, category: "demonstrative", type: "Demonstration" },
+        { regex: /teach me/, baseScore: 14, category: "educational", type: "Educational" },
+        { regex: /help me (with|understand)/, baseScore: 12, category: "assistance", type: "Assistance" },
+        { regex: /compare/, baseScore: 13, category: "analytical", type: "Analytical" },
+        { regex: /analyze/, baseScore: 13, category: "analytical", type: "Analysis" },
+        { regex: /describe/, baseScore: 11, category: "descriptive", type: "Description" },
+        { regex: /list|give me examples/, baseScore: 10, category: "listing", type: "Listing" },
+        { regex: /recommend/, baseScore: 9, category: "advisory", type: "Recommendation" },
+        { regex: /review/, baseScore: 11, category: "evaluative", type: "Review" },
+        { regex: /(step by step|tutorial|guide)/, baseScore: 14, category: "tutorial", type: "Tutorial" }
+    ],
+    
+    // Keyword categories with dynamic scoring
+    keywordCategories: {
+        creative: {
+            baseScore: 8,
+            words: ['poem', 'story', 'song', 'lyrics', 'novel', 'essay', 'article', 'script',
+                   'dialogue', 'character', 'plot', 'narrative', 'creative', 'artistic',
+                   'design', 'imagine', 'invent', 'original']
+        },
+        academic: {
+            baseScore: 10,
+            words: ['universe', 'philosophy', 'theory', 'concept', 'analysis', 'research',
+                   'science', 'physics', 'mathematics', 'history', 'literature', 'psychology',
+                   'sociology', 'economics', 'politics', 'biology', 'chemistry', 'astronomy',
+                   'quantum', 'relativity', 'evolution', 'consciousness', 'existence']
+        },
+        complexity: {
+            baseScore: 7,
+            words: ['explain', 'elaborate', 'detail', 'comprehensive', 'thorough', 'complete',
+                   'understand', 'analyze', 'examine', 'explore', 'investigate', 'discuss',
+                   'evaluate', 'assess', 'critique', 'interpret', 'synthesize']
+        },
+        technical: {
+            baseScore: 9,
+            words: ['algorithm', 'programming', 'software', 'technology', 'computer', 'coding',
+                   'development', 'engineering', 'technical', 'implementation', 'architecture',
+                   'framework', 'methodology', 'optimization', 'debugging']
+        }
+    },
+    
+    // Simple response reducers
+    reductionRules: {
+        simpleGreetings: {
+            penalty: -5,
+            words: ['hi', 'hello', 'hey']
+        },
+        simpleResponses: {
+            penalty: -4,
+            words: ['yes', 'no', 'ok', 'thanks', 'bye', 'cool', 'nice', 'lol']
+        }
+    },
+    
+    // Time-based adjustments
+    timeAdjustments: [
+        { hourRange: [6, 9], score: 2, description: "Morning energy" },
+        { hourRange: [12, 14], score: -1, description: "Afternoon nap" },
+        { hourRange: [20, 23], score: 3, description: "Evening activity" },
+        { hourRange: [0, 5], score: -3, description: "Night sleepiness" }
+    ],
+    
+    // Category multipliers for dynamic adjustment
+    categoryMultipliers: {
+        creative: 1.0,
+        academic: 1.2,
+        technical: 1.1,
+        educational: 1.1,
+        analytical: 1.15,
+        informational: 1.0,
+        instructional: 1.05,
+        questioning: 0.9,
+        requesting: 0.95,
+        demonstrative: 1.0,
+        assistance: 1.0,
+        descriptive: 1.0,
+        listing: 0.9,
+        advisory: 1.0,
+        evaluative: 1.05,
+        tutorial: 1.1
+    }
+};
+
 function analyzePromptComplexity(message) {
     let score = 0;
     const text = message.toLowerCase();
+    const config = COMPLEXITY_CONFIG;
     
     console.log(`\n=== Analyzing: "${message}" ===`);
     
-    // Enhanced base score from message length (more generous)
-    const lengthScore = Math.min(text.length / 3, 25); // More sensitive, max 25 points
+    // Dynamic base score from message length
+    const lengthScore = Math.min(text.length / config.scoring.lengthDivisor, config.scoring.maxLengthScore);
     score += lengthScore;
     console.log(`Length score: ${lengthScore.toFixed(1)} (length: ${text.length})`);
     
-    // Pattern-based detection for common request types
-    let patternScore = 0;
-    const patterns = [
-        { regex: /write (me )?a/, score: 15, type: "Creative Writing" },
-        { regex: /create (me )?a/, score: 15, type: "Creative Request" },
-        { regex: /compose a/, score: 15, type: "Composition" },
-        { regex: /tell me about/, score: 12, type: "Information Request" },
-        { regex: /explain (how|why|what|when|where)/, score: 14, type: "Detailed Explanation" },
-        { regex: /how (do|to|can)/, score: 12, type: "Instructional" },
-        { regex: /what (is|are|would|should)/, score: 10, type: "Definition/Question" },
-        { regex: /give me (a|an|some)/, score: 10, type: "Request" },
-        { regex: /show me/, score: 10, type: "Demonstration" },
-        { regex: /teach me/, score: 14, type: "Educational" },
-        { regex: /help me (with|understand)/, score: 12, type: "Assistance" },
-        { regex: /compare/, score: 13, type: "Analytical" },
-        { regex: /analyze/, score: 13, type: "Analysis" },
-        { regex: /describe/, score: 11, type: "Description" },
-        { regex: /list|give me examples/, score: 10, type: "Listing" },
-        { regex: /recommend/, score: 9, type: "Recommendation" },
-        { regex: /review/, score: 11, type: "Review" },
-        { regex: /(step by step|tutorial|guide)/, score: 14, type: "Tutorial" }
-    ];
+    // Semantic complexity analysis
+    const semanticAnalysis = detectSemanticComplexity(text);
+    score += semanticAnalysis.score;
+    if (semanticAnalysis.score > 0) {
+        console.log(`Semantic complexity: +${semanticAnalysis.score} (relationships: ${semanticAnalysis.details.relationshipCount}, abstract: ${semanticAnalysis.details.abstractCount}, quantitative: ${semanticAnalysis.details.quantitativeCount})`);
+    }
     
-    patterns.forEach(pattern => {
+    // Structural complexity analysis
+    const structuralAnalysis = analyzeTextStructure(text);
+    score += structuralAnalysis.score;
+    if (structuralAnalysis.score > 0) {
+        console.log(`Structural complexity: +${structuralAnalysis.score.toFixed(1)} (commas: ${structuralAnalysis.details.commaCount}, semicolons: ${structuralAnalysis.details.semicolonCount}, colons: ${structuralAnalysis.details.colonCount})`);
+    }
+    
+    // Dynamic pattern-based detection
+    let patternScore = 0;
+    const matchedCategories = new Set();
+    
+    config.patterns.forEach(pattern => {
         if (pattern.regex.test(text)) {
-            patternScore += pattern.score;
-            console.log(`Pattern match: ${pattern.type} (+${pattern.score})`);
+            const categoryMultiplier = config.categoryMultipliers[pattern.category] || 1.0;
+            const adjustedScore = Math.round(pattern.baseScore * categoryMultiplier);
+            patternScore += adjustedScore;
+            matchedCategories.add(pattern.category);
+            console.log(`Pattern match: ${pattern.type} (+${adjustedScore}, base: ${pattern.baseScore}, multiplier: ${categoryMultiplier.toFixed(2)})`);
         }
     });
+    
+    // Category combination bonus
+    const categoryBonus = calculateDynamicCategoryBonus(matchedCategories, config.categoryMultipliers);
+    if (categoryBonus > 0) {
+        patternScore += categoryBonus;
+        console.log(`Category combination bonus: +${categoryBonus} (${matchedCategories.size} categories)`);
+    }
+    
     score += patternScore;
     
-    // Creative and academic keywords (expanded and categorized)
-    const creativeKeywords = [
-        'poem', 'story', 'song', 'lyrics', 'novel', 'essay', 'article', 'script',
-        'dialogue', 'character', 'plot', 'narrative', 'creative', 'artistic',
-        'design', 'imagine', 'invent', 'original'
-    ];
-    
-    const academicKeywords = [
-        'universe', 'philosophy', 'theory', 'concept', 'analysis', 'research',
-        'science', 'physics', 'mathematics', 'history', 'literature', 'psychology',
-        'sociology', 'economics', 'politics', 'biology', 'chemistry', 'astronomy',
-        'quantum', 'relativity', 'evolution', 'consciousness', 'existence'
-    ];
-    
-    const complexityKeywords = [
-        'explain', 'elaborate', 'detail', 'comprehensive', 'thorough', 'complete',
-        'understand', 'analyze', 'examine', 'explore', 'investigate', 'discuss',
-        'evaluate', 'assess', 'critique', 'interpret', 'synthesize'
-    ];
-    
-    const technicalKeywords = [
-        'algorithm', 'programming', 'software', 'technology', 'computer', 'coding',
-        'development', 'engineering', 'technical', 'implementation', 'architecture',
-        'framework', 'methodology', 'optimization', 'debugging'
-    ];
-    
+    // Dynamic keyword scoring with category awareness
     let keywordScore = 0;
+    const keywordMatches = {};
     
-    // Check each category
-    creativeKeywords.forEach(keyword => {
-        if (text.includes(keyword)) {
-            keywordScore += 8;
-            console.log(`Creative keyword: "${keyword}" (+8)`);
+    Object.entries(config.keywordCategories).forEach(([category, categoryConfig]) => {
+        keywordMatches[category] = [];
+        categoryConfig.words.forEach(keyword => {
+            if (text.includes(keyword)) {
+                keywordMatches[category].push(keyword);
+            }
+        });
+        
+        if (keywordMatches[category].length > 0) {
+            // Apply diminishing returns for multiple keywords in same category
+            const categoryMultiplier = config.categoryMultipliers[category] || 1.0;
+            const diminishingFactor = Math.min(1.0, 1.0 / Math.sqrt(keywordMatches[category].length));
+            const totalKeywords = keywordMatches[category].length;
+            const adjustedScore = Math.round(categoryConfig.baseScore * categoryMultiplier * totalKeywords * diminishingFactor);
+            
+            keywordScore += adjustedScore;
+            console.log(`${category} keywords (${totalKeywords}): ${keywordMatches[category].join(', ')} (+${adjustedScore}, diminishing: ${diminishingFactor.toFixed(2)})`);
         }
     });
     
-    academicKeywords.forEach(keyword => {
-        if (text.includes(keyword)) {
-            keywordScore += 10;
-            console.log(`Academic keyword: "${keyword}" (+10)`);
-        }
-    });
-    
-    complexityKeywords.forEach(keyword => {
-        if (text.includes(keyword)) {
-            keywordScore += 7;
-            console.log(`Complexity keyword: "${keyword}" (+7)`);
-        }
-    });
-    
-    technicalKeywords.forEach(keyword => {
-        if (text.includes(keyword)) {
-            keywordScore += 9;
-            console.log(`Technical keyword: "${keyword}" (+9)`);
-        }
-    });
-    
-    // Question indicators
+    // Dynamic punctuation scoring
     const questionMarks = (text.match(/\?/g) || []).length;
-    const questionScore = questionMarks * 5; // Increased impact
+    const questionScore = questionMarks * config.scoring.questionMultiplier;
     score += questionScore;
     console.log(`Question score: ${questionScore} (${questionMarks} question marks)`);
     
-    // Excitement/emphasis indicators
     const exclamationMarks = (text.match(/!/g) || []).length;
-    const excitationScore = exclamationMarks * 3;
+    const excitationScore = exclamationMarks * config.scoring.exclamationMultiplier;
     score += excitationScore;
     console.log(`Excitation score: ${excitationScore} (${exclamationMarks} exclamation marks)`);
     
-    // Complex sentence structure
+    // Dynamic sentence complexity
     const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0).length;
-    const sentenceScore = Math.max(0, (sentences - 1) * 4); // More generous scoring
+    const sentenceScore = Math.max(0, (sentences - 1) * config.scoring.sentenceMultiplier);
     score += sentenceScore;
     console.log(`Sentence score: ${sentenceScore} (${sentences} sentences)`);
     
-    // Complex/academic words (improved detection)
+    // Dynamic word complexity analysis
     const words = text.split(/\s+/);
     const complexWords = words.filter(word => {
         const cleanWord = word.replace(/[^a-z]/g, '');
-        return cleanWord.length > 5; // Lowered threshold
+        return cleanWord.length > config.scoring.complexWordThreshold;
     }).length;
-    const complexWordScore = complexWords * 1.5;
+    const complexWordScore = complexWords * config.scoring.complexWordMultiplier;
     score += complexWordScore;
     console.log(`Complex words score: ${complexWordScore.toFixed(1)} (${complexWords} complex words)`);
     
-    // Simple response reducers (but less aggressive)
-    const simpleGreetings = ['hi', 'hello', 'hey'];
-    const simpleResponses = ['yes', 'no', 'ok', 'thanks', 'bye', 'cool', 'nice', 'lol'];
-    
+    // Dynamic reduction scoring
     let reductionScore = 0;
-    simpleGreetings.forEach(greeting => {
-        if (text === greeting || text === greeting + '!') {
-            reductionScore -= 5;
-            console.log(`Simple greeting: "${greeting}" (-5)`);
-        }
-    });
-    
-    simpleResponses.forEach(response => {
-        if (text === response || text === response + '!') {
-            reductionScore -= 4;
-            console.log(`Simple response: "${response}" (-4)`);
-        }
+    Object.entries(config.reductionRules).forEach(([ruleName, rule]) => {
+        rule.words.forEach(word => {
+            if (text === word || text === word + '!') {
+                reductionScore += rule.penalty;
+                console.log(`${ruleName}: "${word}" (${rule.penalty})`);
+            }
+        });
     });
     
     score += keywordScore + reductionScore;
     console.log(`Keyword score: ${keywordScore}, Reduction score: ${reductionScore}`);
     
-    // Time-based mood adjustment
+    // Dynamic time-based adjustment
     const hour = new Date().getHours();
     let timeScore = 0;
-    if (hour >= 6 && hour <= 9) timeScore = 2; // Morning energy
-    else if (hour >= 12 && hour <= 14) timeScore = -1; // Afternoon nap
-    else if (hour >= 20 && hour <= 23) timeScore = 3; // Evening activity
-    else if (hour >= 0 && hour <= 5) timeScore = -3; // Night sleepiness
-    
+    config.timeAdjustments.forEach(adjustment => {
+        const [start, end] = adjustment.hourRange;
+        if ((start <= end && hour >= start && hour <= end) || 
+            (start > end && (hour >= start || hour <= end))) {
+            timeScore = adjustment.score;
+            console.log(`Time-based score: ${timeScore} (hour: ${hour}, ${adjustment.description})`);
+        }
+    });
     score += timeScore;
-    console.log(`Time-based score: ${timeScore} (hour: ${hour})`);
     
-    // Ensure minimum reasonable score and cap maximum
-    const finalScore = Math.max(2, Math.min(80, Math.round(score)));
+    // Adaptive scoring adjustment
+    const categoryContext = Array.from(matchedCategories);
+    const adaptiveScore = adaptiveScoring(score, text.length, categoryContext);
+    if (adaptiveScore !== score) {
+        console.log(`Adaptive adjustment: ${score} -> ${adaptiveScore} (length: ${text.length}, categories: ${categoryContext.join(', ')})`);
+        score = adaptiveScore;
+    }
+    
+    // Apply final constraints
+    const finalScore = Math.max(config.scoring.minScore, Math.min(config.scoring.maxScore, Math.round(score)));
     console.log(`Final complexity score: ${finalScore}`);
     
     return finalScore;
