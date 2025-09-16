@@ -490,52 +490,106 @@ function calculateMeowCount(complexity) {
 
 function generateMeowVariations(message, count) {
     const text = message.toLowerCase();
-    const catSounds = [];
+    const catSoundsWithContext = [];
     
     // Expanded variety of cat sounds with different emotional contexts
+    // Removed most punctuation from individual sounds - will be added at sentence level
     const standardSounds = ['meow', 'mrow', 'mrrow', 'mew', 'miau'];
-    const questionSounds = ['meow?', 'mrow?', 'mrrow?', 'mew?'];
-    const excitedSounds = ['MEOW!', 'MROW!', 'meow!', 'mrow!', 'MEW!'];
+    const questionSounds = ['meow', 'mrow', 'mrrow', 'mew']; // question context, no punctuation yet
+    const excitedSounds = ['MEOW', 'MROW', 'meow', 'mrow', 'MEW']; // excited context, no punctuation yet
     const contentSounds = ['purr', 'purrr', 'mrrrr', 'prrrr'];
-    const playfulSounds = ['mrow', 'mrp', 'prr', 'mew', 'mewmew', 'miau', 'mew!'];
-    const sadSounds = ['mew...', 'meow...', 'mrow...'];
-    const sleepyTiredSounds = ['mrow...', 'mrrrr...', 'yawn', '*yawn*', 'zzz'];
-    const curiousSounds = ['mrow?', 'mrrow?', 'mew?', 'meow?', 'miau?'];
-    const demandingSounds = ['MEOW', 'MROW', 'MEW', 'FEED ME', "OVERTHROW THE HUMANS"];
-    const affectionateSounds = ['purr', 'mrow', 'meow', 'mrrow', 'purr'];
+    const playfulSounds = ['mrow', 'mrp', 'prr', 'mew', 'mewmew', 'miau'];
+    const sadSounds = ['mew', 'meow', 'mrow']; // sad context, no punctuation yet
+    const sleepyTiredSounds = ['mrow', 'mrrrr', 'yawn', '*yawn*', 'zzz'];
+    const curiousSounds = ['mrow', 'mrrow', 'mew', 'meow', 'miau']; // curious context, no punctuation yet
+    const demandingSounds = ['MEOW', 'MROW', 'MEW', 'FEED ME', "OVERTHROW THE HUMANS"]; // demanding context, no punctuation yet
+    const affectionateSounds = ['purr', 'mrow', 'meow', 'mrrow'];
     
     for (let i = 0; i < count; i++) {
         let soundType = standardSounds;
+        let context = 'standard';
         
         // Choose sound type based on message analysis and context
         if (text.includes('?') && Math.random() < 0.4) {
             soundType = Math.random() < 0.5 ? questionSounds : curiousSounds;
+            context = Math.random() < 0.5 ? 'question' : 'curious';
         } else if ((text.includes('!') || text.includes('excited') || text.includes('happy') || text.includes('amazing')) && Math.random() < 0.35) {
             soundType = excitedSounds;
+            context = 'excited';
         } else if ((text.includes('love') || text.includes('cute') || text.includes('adorable') || text.includes('sweet')) && Math.random() < 0.3) {
             soundType = affectionateSounds;
+            context = 'affectionate';
         } else if ((text.includes('sad') || text.includes('sorry') || text.includes('terrible') || text.includes('awful')) && Math.random() < 0.25) {
             soundType = sadSounds;
+            context = 'sad';
         } else if ((text.includes('tired') || text.includes('sleep') || text.includes('nap') || isNightTime()) && Math.random() < 0.25) {
             soundType = sleepyTiredSounds;
+            context = 'sleepy';
         } else if ((text.includes('play') || text.includes('fun') || text.includes('game') || text.includes('toy')) && Math.random() < 0.3) {
             soundType = playfulSounds;
+            context = 'playful';
         } else if ((text.includes('food') || text.includes('hungry') || text.includes('treat') || text.includes('feed')) && Math.random() < 0.4) {
             soundType = demandingSounds;
+            context = 'demanding';
         } else if ((text.includes('good') || text.includes('nice') || text.includes('relaxed') || text.includes('comfortable')) && Math.random() < 0.25) {
             soundType = contentSounds;
+            context = 'content';
         } else if (Math.random() < 0.2) {
             // Random variety to keep things interesting
             const allSpecialSounds = [...playfulSounds, ...contentSounds, ...curiousSounds];
             soundType = allSpecialSounds;
+            context = 'playful';
         }
         
         // Select random sound from the chosen type
         const selectedSound = soundType[Math.floor(Math.random() * soundType.length)];
-        catSounds.push(selectedSound);
+        catSoundsWithContext.push({ sound: selectedSound, context: context });
     }
     
-    return catSounds;
+    return formatCatSoundsIntoSentences(catSoundsWithContext);
+}
+
+function formatCatSoundsIntoSentences(catSoundsWithContext) {
+    // Group cat sounds into sentences with proper punctuation
+    const sentences = [];
+    let currentSentence = [];
+    let sentenceContext = 'standard';
+    
+    for (let i = 0; i < catSoundsWithContext.length; i++) {
+        const { sound, context } = catSoundsWithContext[i];
+        currentSentence.push(sound);
+        
+        // Update sentence context to match strongest emotion
+        if (context !== 'standard' && sentenceContext === 'standard') {
+            sentenceContext = context;
+        }
+        
+        // Decide when to end a sentence (every 3-6 sounds)
+        const sentenceLength = Math.floor(Math.random() * 4) + 3; // 3-6 sounds per sentence
+        const isLastSound = i === catSoundsWithContext.length - 1;
+        
+        if (currentSentence.length >= sentenceLength || isLastSound) {
+            // Add appropriate punctuation based on context
+            let punctuation = '.';
+            if (sentenceContext === 'question' || sentenceContext === 'curious') {
+                punctuation = '?';
+            } else if (sentenceContext === 'excited' || sentenceContext === 'demanding') {
+                punctuation = '!';
+            } else if (sentenceContext === 'sad' || sentenceContext === 'sleepy') {
+                punctuation = '...';
+            }
+            
+            // Join the sentence and add punctuation
+            const sentence = currentSentence.join(' ') + punctuation;
+            sentences.push(sentence);
+            
+            // Reset for next sentence
+            currentSentence = [];
+            sentenceContext = 'standard';
+        }
+    }
+    
+    return sentences;
 }
 
 function isNightTime() {
@@ -549,8 +603,8 @@ function generateWelcomeMeows() {
     const welcomeSounds = [];
     
     const standardSounds = ['meow', 'mrow', 'mrrow', 'mew', 'miau'];
-    const questionSounds = ['meow?', 'mrow?', 'mrrow?', 'mew?'];
-    const excitedSounds = ['MEOW!', 'MROW!', 'meow!', 'mrow!', 'MEW!'];
+    const questionSounds = ['meow', 'mrow', 'mrrow', 'mew'];
+    const excitedSounds = ['MEOW', 'MROW', 'meow', 'mrow', 'MEW'];
     
     for (let i = 0; i < welcomeCount; i++) {
         let soundType;
@@ -568,7 +622,10 @@ function generateWelcomeMeows() {
         welcomeSounds.push(selectedSound);
     }
     
-    return welcomeSounds.join(' ');
+    // Add appropriate punctuation for welcome message
+    const welcomeSentence = welcomeSounds.join(' ');
+    const finalRand = Math.random();
+    return finalRand < 0.75 ? welcomeSentence + '!' : welcomeSentence + '?';
 }
 
 // Socket.IO connection handling
@@ -605,8 +662,9 @@ io.on('connection', (socket) => {
         const complexity = analyzePromptComplexity(message);
         
         // Generate contextual cat sound response based on user input
-        const catSounds = generateMeowVariations(message, complexity);
-        const words = catSounds; // Each cat sound is a "token"
+        const catSentences = generateMeowVariations(message, complexity);
+        // Split sentences into individual words for streaming
+        const words = catSentences.join(' ').split(' ');
         
         // Create AI message object
         const aiMessage = {
