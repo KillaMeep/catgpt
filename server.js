@@ -973,7 +973,7 @@ function generateMeowVariations(message, count) {
     const defensiveSounds = ['hiss', 'spit', 'growl', 'grr', 'mrow', 'mrr'];
     const hostileSounds = ['HISS', 'SPIT', 'GROWL', 'GRR', 'YOWL', '*hiss*', '*spit*', 'RAWR'];
     const annoyedSounds = ['meh', 'mrr', 'grumble', 'hmph', 'mrow', 'tch'];
-    const warySound = ['mrr', 'mrow', 'hm', 'mew', 'careful meow'];
+    const warySound = ['mrr', 'mrow', 'hm', 'mew'];
     
     for (let i = 0; i < count; i++) {
         let soundType = standardSounds;
