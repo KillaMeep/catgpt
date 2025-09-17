@@ -1023,7 +1023,7 @@ function generateMeowVariations(message, count) {
             if (text.includes('?') && Math.random() < 0.4) {
                 soundType = Math.random() < 0.5 ? questionSounds : curiousSounds;
                 context = Math.random() < 0.5 ? 'question' : 'curious';
-            } else if ((text.includes('tired') || text.includes('sleep') || text.includes('nap') || isNightTime()) && Math.random() < 0.25) {
+            } else if ((text.includes('tired') || text.includes('sleep') || text.includes('nap') || isNightTime()) && Math.random() < 0.1) {
                 soundType = sleepyTiredSounds;
                 context = 'sleepy';
             } else if ((text.includes('food') || text.includes('hungry') || text.includes('treat') || text.includes('feed')) && Math.random() < 0.4) {
