@@ -502,7 +502,7 @@ function generateMeowVariations(message, count) {
     const sadSounds = ['mew', 'meow', 'mrow']; // sad context, no punctuation yet
     const sleepyTiredSounds = ['mrow', 'mrrrr', 'yawn', '*yawn*', 'zzz'];
     const curiousSounds = ['mrow', 'mrrow', 'mew', 'meow', 'miau']; // curious context, no punctuation yet
-    const demandingSounds = ['MEOW', 'MROW', 'MEW', 'FEED ME', "OVERTHROW THE HUMANS"]; // demanding context, no punctuation yet
+    const demandingSounds = ['MEOW', 'MROW', 'MEW', 'FEED ME', "OVERTHROW THE GOVERNMENT"]; // demanding context, no punctuation yet
     const affectionateSounds = ['purr', 'mrow', 'meow', 'mrrow'];
     
     for (let i = 0; i < count; i++) {
@@ -569,14 +569,36 @@ function formatCatSoundsIntoSentences(catSoundsWithContext) {
         const isLastSound = i === catSoundsWithContext.length - 1;
         
         if (currentSentence.length >= sentenceLength || isLastSound) {
-            // Add appropriate punctuation based on context
-            let punctuation = '.';
-            if (sentenceContext === 'question' || sentenceContext === 'curious') {
-                punctuation = '?';
-            } else if (sentenceContext === 'excited' || sentenceContext === 'demanding') {
-                punctuation = '!';
-            } else if (sentenceContext === 'sad' || sentenceContext === 'sleepy') {
-                punctuation = '...';
+            // Cat emoticons organized by context
+            const catEmoticons = {
+                standard: [':3', ':>', '=^.^=', '^.^', '~(＾◡＾)~'],
+                question: [':3?', ':>?', '=^.^=?', '^.^?', '(・・)?'],
+                excited: [':D', ':3!', 'X3', '=^o^=', '^o^', '>:3', '(＾◡＾)'],
+                demanding: ['>:3', '>:(', '=^x^=', '(>_<)', '~(>_<)~'],
+                sad: [':(', ':c', ';-;', '(╥﹏╥)', '=T.T='],
+                sleepy: ['=.=', '-.-', '=~.~=', '(-.-)', 'zzz :3'],
+                content: [':3', '=^.^=', '^.^', '(￣▾￣)', '~(＾◡＾)~'],
+                affectionate: ['♡(˃͈ દ ˂͈ ༶)', ':3♡', '=^.^=♡', '(◡ ‿ ◡)', '♡~'],
+                playful: [':3', ':P', 'X3', '=^.^=', '>:3', '^o^'],
+                curious: [':3?', '=^.^=?', '(・・)?', '(´・ω・`)?', '^.^?']
+            };
+            
+            // 20% chance to use cat emoticons instead of regular punctuation
+            let punctuation;
+            if (Math.random() < 0.2 && catEmoticons[sentenceContext]) {
+                // Use cat emoticon for this context
+                const emoticons = catEmoticons[sentenceContext];
+                punctuation = ' ' + emoticons[Math.floor(Math.random() * emoticons.length)];
+            } else {
+                // Use regular punctuation
+                punctuation = '.';
+                if (sentenceContext === 'question' || sentenceContext === 'curious') {
+                    punctuation = '?';
+                } else if (sentenceContext === 'excited' || sentenceContext === 'demanding') {
+                    punctuation = '!';
+                } else if (sentenceContext === 'sad' || sentenceContext === 'sleepy') {
+                    punctuation = '...';
+                }
             }
             
             // Join the sentence and add punctuation
