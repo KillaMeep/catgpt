@@ -162,7 +162,7 @@ function updateAIMessage(content, isStreaming) {
         messageContent.innerHTML = `
             <div class="message-text">${escapeHtml(content)}</div>
             <div class="message-actions">
-                <button class="speak-button" onclick="speakMessage('${escapeHtml(content).replace(/'/g, "\\'")}', this)" title="Speak it with cat sounds!">
+                <button class="speak-button" onclick="speakMessage('${escapeHtml(content).replace(/'/g, "\\'")}', this)" title="Speak it with cat sounds! (Click again to stop)">
                     <i class="fas fa-volume-up"></i>
                 </button>
             </div>
@@ -245,7 +245,7 @@ function displayCompletedAIMessage(content) {
         <div class="message-content">
             <div class="message-text">${escapeHtml(content)}</div>
             <div class="message-actions">
-                <button class="speak-button" onclick="speakMessage('${escapeHtml(content).replace(/'/g, "\\'")}', this)" title="Speak it with cat sounds!">
+                <button class="speak-button" onclick="speakMessage('${escapeHtml(content).replace(/'/g, "\\'")}', this)" title="Speak it with cat sounds! (Click again to stop)">
                     <i class="fas fa-volume-up"></i>
                 </button>
             </div>
@@ -491,9 +491,9 @@ async function playAudioSequence(sequence, button) {
         return;
     }
     
-    // Update button state
+    // Update button state - keep it enabled so user can stop playback
     button.innerHTML = '<i class="fas fa-stop"></i>';
-    button.disabled = true;
+    button.disabled = false; // Keep enabled for stopping
     button.classList.add('playing');
     
     try {
@@ -501,7 +501,8 @@ async function playAudioSequence(sequence, button) {
             sequence: sequence,
             button: button,
             currentIndex: 0,
-            isPlaying: true
+            isPlaying: true,
+            currentAudio: null // Track current playing audio for immediate stopping
         };
         
         for (let i = 0; i < sequence.length; i++) {
@@ -514,6 +515,12 @@ async function playAudioSequence(sequence, button) {
             
             try {
                 await playAudioFileSmooth(audioItem.file, i === 0, i === sequence.length - 1);
+                
+                // Check again if playback was stopped during audio play
+                if (!currentAudioPlayback || !currentAudioPlayback.isPlaying) {
+                    break;
+                }
+                
                 // Varied delay between sounds for more natural rhythm
                 const delay = 150 + Math.random() * 100; // 150-250ms delay
                 await new Promise(resolve => setTimeout(resolve, delay));
@@ -540,6 +547,11 @@ function playAudioFileSmooth(src, isFirst = false, isLast = false) {
     return new Promise((resolve, reject) => {
         const audio = new Audio(src);
         
+        // Track current audio in the playback object for stopping
+        if (currentAudioPlayback) {
+            currentAudioPlayback.currentAudio = audio;
+        }
+        
         // Set initial volume for fade-in effect
         audio.volume = isFirst ? 0 : 0.3;
         
@@ -548,6 +560,12 @@ function playAudioFileSmooth(src, isFirst = false, isLast = false) {
         });
         
         audio.addEventListener('canplaythrough', () => {
+            // Check if playback was stopped before we start playing
+            if (!currentAudioPlayback || !currentAudioPlayback.isPlaying) {
+                resolve();
+                return;
+            }
+            
             audio.play().then(() => {
                 // Fade in effect
                 if (isFirst) {
@@ -558,6 +576,14 @@ function playAudioFileSmooth(src, isFirst = false, isLast = false) {
                 
                 // Set up fade out before the sound ends
                 audio.addEventListener('timeupdate', function fadeOutHandler() {
+                    // Check if playback was stopped
+                    if (!currentAudioPlayback || !currentAudioPlayback.isPlaying) {
+                        audio.pause();
+                        audio.currentTime = 0;
+                        resolve();
+                        return;
+                    }
+                    
                     const timeLeft = audio.duration - audio.currentTime;
                     
                     // Start fade out in the last 150ms (or 100ms for short sounds)
@@ -623,7 +649,7 @@ async function speakMessage(text, button) {
         return;
     }
     
-    // Stop current playback if running
+    // If currently playing, stop playback
     if (currentAudioPlayback && currentAudioPlayback.isPlaying) {
         stopCurrentPlayback();
         return;
@@ -645,6 +671,13 @@ function stopCurrentPlayback() {
     if (currentAudioPlayback) {
         currentAudioPlayback.isPlaying = false;
         
+        // Immediately stop any currently playing audio
+        if (currentAudioPlayback.currentAudio) {
+            currentAudioPlayback.currentAudio.pause();
+            currentAudioPlayback.currentAudio.currentTime = 0;
+            currentAudioPlayback.currentAudio = null;
+        }
+        
         if (currentAudioPlayback.button) {
             currentAudioPlayback.button.innerHTML = '<i class="fas fa-volume-up"></i>';
             currentAudioPlayback.button.disabled = false;
@@ -652,6 +685,7 @@ function stopCurrentPlayback() {
         }
         
         currentAudioPlayback = null;
+        console.log('🔇 Audio playback stopped by user');
     }
 }
 
