@@ -7,6 +7,117 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
+// Enhanced logging utilities
+const Logger = {
+    getTimestamp: () => new Date().toISOString(),
+    formatDuration: (start, end) => `${(end - start).toFixed(2)}ms`,
+    
+    info: (message, data = null) => {
+        const timestamp = Logger.getTimestamp();
+        if (data) {
+            console.log(`[${timestamp}] [INFO] ${message}`, data);
+        } else {
+            console.log(`[${timestamp}] [INFO] ${message}`);
+        }
+    },
+    
+    warn: (message, data = null) => {
+        const timestamp = Logger.getTimestamp();
+        if (data) {
+            console.warn(`[${timestamp}] [WARN] ${message}`, data);
+        } else {
+            console.warn(`[${timestamp}] [WARN] ${message}`);
+        }
+    },
+    
+    error: (message, error = null) => {
+        const timestamp = Logger.getTimestamp();
+        if (error) {
+            console.error(`[${timestamp}] [ERROR] ${message}`, error);
+        } else {
+            console.error(`[${timestamp}] [ERROR] ${message}`);
+        }
+    },
+    
+    debug: (message, data = null) => {
+        const timestamp = Logger.getTimestamp();
+        if (data) {
+            console.log(`[${timestamp}] [DEBUG] ${message}`, data);
+        } else {
+            console.log(`[${timestamp}] [DEBUG] ${message}`);
+        }
+    },
+    
+    socket: (socketId, event, message, data = null) => {
+        const timestamp = Logger.getTimestamp();
+        const shortId = socketId.substring(0, 8);
+        if (data) {
+            console.log(`[${timestamp}] [SOCKET:${shortId}] [${event}] ${message}`, data);
+        } else {
+            console.log(`[${timestamp}] [SOCKET:${shortId}] [${event}] ${message}`);
+        }
+    }
+};
+
+// Server statistics tracking
+const serverStats = {
+    startTime: Date.now(),
+    totalConnections: 0,
+    activeConnections: 0,
+    totalMessages: 0,
+    totalResponses: 0,
+    averageResponseTime: 0,
+    responseTimes: [],
+    
+    addResponseTime: function(time) {
+        this.responseTimes.push(time);
+        if (this.responseTimes.length > 100) {
+            this.responseTimes.shift(); // Keep only last 100 response times
+        }
+        this.averageResponseTime = this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length;
+    },
+    
+    getUptime: function() {
+        const uptimeMs = Date.now() - this.startTime;
+        const hours = Math.floor(uptimeMs / (1000 * 60 * 60));
+        const minutes = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((uptimeMs % (1000 * 60)) / 1000);
+        return `${hours}h ${minutes}m ${seconds}s`;
+    },
+    
+    getStats: function() {
+        return {
+            uptime: this.getUptime(),
+            totalConnections: this.totalConnections,
+            activeConnections: this.activeConnections,
+            totalMessages: this.totalMessages,
+            totalResponses: this.totalResponses,
+            averageResponseTime: this.averageResponseTime.toFixed(2) + 'ms',
+            conversationsStored: conversations.size,
+            memoryUsage: process.memoryUsage()
+        };
+    }
+};
+
+// Request logging middleware
+app.use((req, res, next) => {
+    const startTime = Date.now();
+    Logger.info(`${req.method} ${req.url}`, {
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
+    });
+    
+    res.on('finish', () => {
+        const duration = Date.now() - startTime;
+        Logger.info(`${req.method} ${req.url} - ${res.statusCode}`, {
+            duration: `${duration}ms`,
+            contentLength: res.get('Content-Length') || 'unknown'
+        });
+    });
+    
+    next();
+});
+
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -198,7 +309,7 @@ function updateComplexityConfig(newConfig) {
         COMPLEXITY_CONFIG.timeAdjustments = newConfig.timeAdjustments;
     }
     
-    console.log('Complexity configuration updated');
+    Logger.debug('Complexity configuration updated', newConfig);
 }
 
 // Export configuration for external access (if needed for testing or configuration)
@@ -456,35 +567,36 @@ function analyzePromptComplexity(message) {
 }
 
 function calculateMeowCount(complexity) {
-    console.log(`Calculating meow count for complexity: ${complexity}`);
+    Logger.debug(`Calculating meow count for complexity: ${complexity}`);
     
     // Extended mapping with ~2x longer responses: complexity (2-80) to meow count (2-120)
     let meowCount;
+    let range;
     
     if (complexity <= 6) {
         meowCount = Math.floor(Math.random() * 4) + 2; // 2-5 meows (very short)
-        console.log('Very short response range (2-5 meows)');
+        range = 'Very short response range (2-5 meows)';
     } else if (complexity <= 12) {
         meowCount = Math.floor(Math.random() * 6) + 5; // 5-10 meows (short)
-        console.log('Short response range (5-10 meows)');
+        range = 'Short response range (5-10 meows)';
     } else if (complexity <= 20) {
         meowCount = Math.floor(Math.random() * 10) + 10; // 10-19 meows (medium-short)
-        console.log('Medium-short response range (10-19 meows)');
+        range = 'Medium-short response range (10-19 meows)';
     } else if (complexity <= 30) {
         meowCount = Math.floor(Math.random() * 15) + 20; // 20-34 meows (medium)
-        console.log('Medium response range (20-34 meows)');
+        range = 'Medium response range (20-34 meows)';
     } else if (complexity <= 45) {
         meowCount = Math.floor(Math.random() * 20) + 30; // 30-49 meows (long)
-        console.log('Long response range (30-49 meows)');
+        range = 'Long response range (30-49 meows)';
     } else if (complexity <= 60) {
         meowCount = Math.floor(Math.random() * 25) + 45; // 45-69 meows (very long)
-        console.log('Very long response range (45-69 meows)');
+        range = 'Very long response range (45-69 meows)';
     } else {
         meowCount = Math.floor(Math.random() * 35) + 60; // 60-94 meows (extremely long)
-        console.log('Extremely long response range (60-94 meows)');
+        range = 'Extremely long response range (60-94 meows)';
     }
     
-    console.log(`Generated meow count: ${meowCount}\n`);
+    Logger.debug(`Generated meow count: ${meowCount} (${range})`);
     return meowCount;
 }
 
@@ -573,12 +685,12 @@ function formatCatSoundsIntoSentences(catSoundsWithContext) {
             const catEmoticons = {
                 standard: [':3', ':>', '=^.^=', '^.^', '~(＾◡＾)~'],
                 question: [':3?', ':>?', '=^.^=?', '^.^?', '(・・)?'],
-                excited: [':D', ':3!', 'X3', '=^o^=', '^o^', '>:3', '(＾◡＾)'],
+                excited: [':3!', 'X3', '=^o^=', '^o^', '>:3'],
                 demanding: ['>:3', '>:(', '=^x^=', '(>_<)', '~(>_<)~'],
-                sad: [':(', ':c', ';-;', '(╥﹏╥)', '=T.T='],
+                sad: [':(', ':c', ';-;'],
                 sleepy: ['=.=', '-.-', '=~.~=', '(-.-)', 'zzz :3'],
                 content: [':3', '=^.^=', '^.^', '(￣▾￣)', '~(＾◡＾)~'],
-                affectionate: ['♡(˃͈ દ ˂͈ ༶)', ':3♡', '=^.^=♡', '(◡ ‿ ◡)', '♡~'],
+                affectionate: [':3♡', '=^.^=♡'],
                 playful: [':3', ':P', 'X3', '=^.^=', '>:3', '^o^'],
                 curious: [':3?', '=^.^=?', '(・・)?', '(´・ω・`)?', '^.^?']
             };
@@ -652,19 +764,48 @@ function generateWelcomeMeows() {
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-    console.log('A user connected');
+    const clientInfo = {
+        id: socket.id,
+        ip: socket.handshake.address,
+        userAgent: socket.handshake.headers['user-agent'],
+        connectTime: Date.now()
+    };
+    
+    serverStats.totalConnections++;
+    serverStats.activeConnections++;
+    
+    Logger.socket(socket.id, 'CONNECT', 'User connected', {
+        ip: clientInfo.ip,
+        userAgent: clientInfo.userAgent,
+        totalConnections: serverStats.totalConnections,
+        activeConnections: serverStats.activeConnections
+    });
     
     // Generate a unique conversation ID for this session
     const conversationId = Date.now().toString();
     conversations.set(conversationId, []);
     
+    Logger.socket(socket.id, 'SESSION', `New conversation created: ${conversationId}`);
+    
     socket.emit('conversation-id', conversationId);
     
     // Send welcome meows for the subtitle
-    socket.emit('welcome-meows', generateWelcomeMeows());
+    const welcomeMeows = generateWelcomeMeows();
+    Logger.socket(socket.id, 'WELCOME', `Sending welcome meows: "${welcomeMeows}"`);
+    socket.emit('welcome-meows', welcomeMeows);
     
     socket.on('send-message', async (data) => {
+        const messageStartTime = Date.now();
         const { message, conversationId } = data;
+        
+        serverStats.totalMessages++;
+        
+        Logger.socket(socket.id, 'MESSAGE', `Received message (${message.length} chars)`, {
+            conversationId,
+            messagePreview: message.length > 50 ? message.substring(0, 50) + '...' : message,
+            messageLength: message.length,
+            totalMessages: serverStats.totalMessages
+        });
         
         // Store user message
         const userMessage = {
@@ -675,18 +816,41 @@ io.on('connection', (socket) => {
         
         if (conversations.has(conversationId)) {
             conversations.get(conversationId).push(userMessage);
+            Logger.socket(socket.id, 'STORE', `User message stored in conversation ${conversationId}`, {
+                conversationLength: conversations.get(conversationId).length
+            });
+        } else {
+            Logger.socket(socket.id, 'ERROR', `Conversation ${conversationId} not found`);
         }
         
         // Send user message back to client
         socket.emit('user-message', userMessage);
+        Logger.socket(socket.id, 'EMIT', 'User message echoed to client');
         
         // Analyze the complexity to determine streaming speed
+        const complexityStartTime = Date.now();
         const complexity = analyzePromptComplexity(message);
+        const complexityDuration = Date.now() - complexityStartTime;
+        
+        Logger.socket(socket.id, 'ANALYSIS', `Complexity analysis completed`, {
+            complexity,
+            analysisTime: `${complexityDuration}ms`
+        });
         
         // Generate contextual cat sound response based on user input
+        const generationStartTime = Date.now();
         const catSentences = generateMeowVariations(message, complexity);
+        const generationDuration = Date.now() - generationStartTime;
+        
         // Split sentences into individual words for streaming
         const words = catSentences.join(' ').split(' ');
+        
+        Logger.socket(socket.id, 'GENERATION', `Cat response generated`, {
+            sentences: catSentences.length,
+            totalWords: words.length,
+            generationTime: `${generationDuration}ms`,
+            responsePreview: words.slice(0, 5).join(' ') + (words.length > 5 ? '...' : '')
+        });
         
         // Create AI message object
         const aiMessage = {
@@ -698,11 +862,16 @@ io.on('connection', (socket) => {
         
         // Start streaming response
         socket.emit('ai-message-start', aiMessage);
+        Logger.socket(socket.id, 'STREAM', 'Started streaming response');
+        
+        const streamingStartTime = Date.now();
+        let totalStreamingDelay = 0;
         
         // Simulate realistic tokenizer behavior with variable delays
         for (let i = 0; i < words.length; i++) {
             // Calculate delay based on tokenizer-like behavior
             let delay = calculateTokenizerDelay(words[i], i, words.length, complexity);
+            totalStreamingDelay += delay;
             
             await new Promise(resolve => setTimeout(resolve, delay));
             
@@ -711,7 +880,14 @@ io.on('connection', (socket) => {
                 content: aiMessage.content,
                 isComplete: i === words.length - 1
             });
+            
+            // Log progress every 10 words or at the end
+            if (i % 10 === 0 || i === words.length - 1) {
+                Logger.socket(socket.id, 'CHUNK', `Streaming progress: ${i + 1}/${words.length} words`);
+            }
         }
+        
+        const streamingDuration = Date.now() - streamingStartTime;
         
         // Finalize the message
         aiMessage.isStreaming = false;
@@ -720,25 +896,117 @@ io.on('connection', (socket) => {
         }
         
         socket.emit('ai-message-complete', aiMessage);
+        
+        const totalResponseTime = Date.now() - messageStartTime;
+        serverStats.totalResponses++;
+        serverStats.addResponseTime(totalResponseTime);
+        
+        Logger.socket(socket.id, 'COMPLETE', `Response completed`, {
+            totalResponseTime: `${totalResponseTime}ms`,
+            streamingTime: `${streamingDuration}ms`,
+            totalStreamingDelay: `${totalStreamingDelay}ms`,
+            wordsStreamed: words.length,
+            avgWordDelay: `${(totalStreamingDelay / words.length).toFixed(1)}ms`,
+            totalResponses: serverStats.totalResponses,
+            avgResponseTime: `${serverStats.averageResponseTime.toFixed(2)}ms`
+        });
     });
     
     socket.on('get-conversation', (conversationId) => {
+        Logger.socket(socket.id, 'REQUEST', `Conversation history requested: ${conversationId}`);
+        
         if (conversations.has(conversationId)) {
-            socket.emit('conversation-history', conversations.get(conversationId));
+            const conversation = conversations.get(conversationId);
+            socket.emit('conversation-history', conversation);
+            Logger.socket(socket.id, 'HISTORY', `Sent conversation history`, {
+                conversationId,
+                messageCount: conversation.length
+            });
+        } else {
+            Logger.socket(socket.id, 'ERROR', `Conversation ${conversationId} not found for history request`);
         }
     });
     
     socket.on('request-welcome-meows', () => {
-        socket.emit('welcome-meows', generateWelcomeMeows());
+        Logger.socket(socket.id, 'REQUEST', 'Welcome meows requested');
+        const welcomeMeows = generateWelcomeMeows();
+        socket.emit('welcome-meows', welcomeMeows);
+        Logger.socket(socket.id, 'WELCOME', `New welcome meows sent: "${welcomeMeows}"`);
     });
     
-    socket.on('disconnect', () => {
-        console.log('User disconnected');
+    socket.on('disconnect', (reason) => {
+        const sessionDuration = Date.now() - clientInfo.connectTime;
+        serverStats.activeConnections--;
+        
+        Logger.socket(socket.id, 'DISCONNECT', `User disconnected: ${reason}`, {
+            sessionDuration: `${(sessionDuration / 1000).toFixed(1)}s`,
+            activeConnections: serverStats.activeConnections,
+            ip: clientInfo.ip
+        });
+    });
+    
+    socket.on('error', (error) => {
+        Logger.socket(socket.id, 'ERROR', `Socket error occurred`, error);
     });
 });
 
 const PORT = process.env.PORT || 7342;
+
+// Enhanced server startup with detailed logging
 server.listen(PORT, () => {
-    console.log(`CatGPT server running on port ${PORT}`);
-    console.log(`Open http://localhost:${PORT} to start chatting with CatGPT! 🐱`);
+    Logger.info(`CatGPT server starting up...`);
+    Logger.info(`Server listening on port ${PORT}`);
+    Logger.info(`Server URL: http://localhost:${PORT}`);
+    Logger.info(`Node.js version: ${process.version}`);
+    Logger.info(`Platform: ${process.platform} ${process.arch}`);
+    Logger.info(`Memory usage:`, process.memoryUsage());
+    Logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    Logger.info(`🐱 CatGPT server ready to meow! 🐱`);
+    
+    // Log server stats every 5 minutes
+    setInterval(() => {
+        Logger.info(`📊 Server Statistics:`, serverStats.getStats());
+    }, 5 * 60 * 1000); // 5 minutes
+});
+
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
+    Logger.info('SIGTERM received, shutting down gracefully...');
+    server.close(() => {
+        Logger.info('Server closed successfully');
+        process.exit(0);
+    });
+});
+
+process.on('SIGINT', () => {
+    Logger.info('SIGINT received, shutting down gracefully...');
+    server.close(() => {
+        Logger.info('Server closed successfully');
+        process.exit(0);
+    });
+});
+
+// Error handling
+process.on('uncaughtException', (error) => {
+    Logger.error('Uncaught Exception:', error);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    Logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Express error handling middleware
+app.use((error, req, res, next) => {
+    Logger.error('Express error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+});
+
+// 404 handler
+app.use((req, res) => {
+    Logger.warn(`404 Not Found: ${req.method} ${req.url}`, {
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
+    });
+    res.status(404).json({ error: 'Not found' });
 });
