@@ -700,7 +700,7 @@ function calculateMeowCount(complexity) {
     return meowCount;
 }
 
-// Enhanced Sentiment Analysis using Natural.js
+// Simplified Sentiment Analysis using Natural.js
 function analyzeSentimentWithNatural(text) {
     const startTime = Date.now();
     
@@ -713,7 +713,7 @@ function analyzeSentimentWithNatural(text) {
     let analyzedWords = 0;
     
     // Basic positive/negative word lists that work well with Natural
-    const positiveWords = ['good', 'great', 'awesome', 'amazing', 'love', 'like', 'happy', 'wonderful', 'excellent', 'fantastic', 'perfect', 'beautiful', 'nice', 'cute', 'adorable', 'sweet', 'fun', 'exciting', 'brilliant', 'superb'];
+    const positiveWords = ['good', 'great', 'awesome', 'amazing', 'love', 'like', 'happy', 'wonderful', 'excellent', 'fantastic', 'perfect', 'beautiful', 'nice', 'cute', 'adorable', 'sweet', 'fun', 'exciting', 'brilliant', 'superb', 'hey', 'hi', 'hello'];
     const negativeWords = ['bad', 'terrible', 'awful', 'hate', 'horrible', 'disgusting', 'stupid', 'annoying', 'boring', 'sad', 'angry', 'frustrated', 'disappointed', 'upset', 'worried', 'stressed', 'mean', 'rude', 'nasty', 'pathetic'];
     
     tokens.forEach(token => {
@@ -729,73 +729,20 @@ function analyzeSentimentWithNatural(text) {
         }
     });
     
-    // Normalize score based on word count
-    const normalizedScore = analyzedWords > 0 ? sentimentScore / analyzedWords : 0;
+    // Normalize score based on word count (this is Natural.js's pure output)
+    const naturalScore = analyzedWords > 0 ? sentimentScore / analyzedWords : 0;
     
-    // Analyze contextual factors for enhanced accuracy
-    const contextualFactors = {
-        exclamationMarks: (text.match(/!/g) || []).length,
-        questionMarks: (text.match(/\?/g) || []).length,
-        capsWords: (text.match(/[A-Z]{2,}/g) || []).length,
-        repeatedLetters: (text.match(/([a-z])\1{2,}/gi) || []).length,
-        textLength: text.length,
-        wordCount: tokens.length
-    };
-    
-    // Enhance Natural's score with contextual amplification
-    let enhancedScore = normalizedScore;
-    
-    // Amplify based on exclamation marks (moderate amplification)
-    if (contextualFactors.exclamationMarks > 0) {
-        // For positive sentiment, exclamations boost it
-        // For neutral/negative, we need to be more careful
-        if (enhancedScore >= 0) {
-            const exclamationMultiplier = 1 + (contextualFactors.exclamationMarks * 0.3);
-            enhancedScore *= exclamationMultiplier;
-        } else {
-            // For negative sentiment, exclamations might indicate intensity, not positivity
-            const exclamationMultiplier = 1 + (contextualFactors.exclamationMarks * 0.2);
-            enhancedScore *= exclamationMultiplier;
-        }
-    }
-    
-    // Amplify based on caps words
-    if (contextualFactors.capsWords > 0) {
-        const capsMultiplier = 1 + (contextualFactors.capsWords * 0.2);
-        enhancedScore *= capsMultiplier;
-    }
-    
-    // Amplify based on repeated letters (enthusiasm indicators)
-    if (contextualFactors.repeatedLetters > 0) {
-        if (enhancedScore >= 0) {
-            const repeatMultiplier = 1 + (contextualFactors.repeatedLetters * 0.15);
-            enhancedScore *= repeatMultiplier;
-        }
-    }
-    
-    // Special handling for greetings and friendly words
-    const friendlyWords = ['hey', 'hi', 'hello', 'kitty', 'cat', 'meow'];
-    const hasFriendlyWords = tokens.some(token => friendlyWords.includes(token));
-    
-    if (hasFriendlyWords && enhancedScore >= -0.1) {
-        // Boost neutral/slightly negative greetings to positive
-        enhancedScore = Math.max(0.2, enhancedScore + 0.3);
-    }
-    
-    // Normalize enhanced score to -1 to 1 range
-    enhancedScore = Math.max(-1, Math.min(1, enhancedScore));
-    
-    // Determine sentiment category and intensity
+    // Determine sentiment category and intensity based purely on Natural.js score
     let sentiment, intensity;
-    const absScore = Math.abs(enhancedScore);
+    const absScore = Math.abs(naturalScore);
     
-    if (enhancedScore > 0.05) {
+    if (naturalScore > 0.05) {
         sentiment = 'positive';
         if (absScore > 0.6) intensity = 'extreme';
         else if (absScore > 0.35) intensity = 'high';
         else if (absScore > 0.15) intensity = 'moderate';
         else intensity = 'low';
-    } else if (enhancedScore < -0.05) {
+    } else if (naturalScore < -0.05) {
         sentiment = 'negative';
         if (absScore > 0.6) intensity = 'extreme';
         else if (absScore > 0.35) intensity = 'high';
@@ -811,12 +758,10 @@ function analyzeSentimentWithNatural(text) {
     const result = {
         sentiment: sentiment,
         intensity: intensity,
-        score: enhancedScore,
-        naturalScore: normalizedScore,
+        score: naturalScore,
         tokensAnalyzed: tokens.length,
         wordsAnalyzed: analyzedWords,
-        contextualFactors: contextualFactors,
-        analysisMethod: 'natural-enhanced',
+        analysisMethod: 'natural-pure',
         processingTime: analysisTime
     };
     
@@ -825,17 +770,10 @@ function analyzeSentimentWithNatural(text) {
         messageLength: text.length,
         sentiment: sentiment,
         intensity: intensity,
-        enhancedScore: enhancedScore.toFixed(3),
-        naturalScore: normalizedScore.toFixed(3),
+        score: naturalScore.toFixed(3),
         tokensAnalyzed: tokens.length,
         wordsAnalyzed: analyzedWords,
-        processingTime: `${analysisTime}ms`,
-        contextual: {
-            exclamations: contextualFactors.exclamationMarks,
-            questions: contextualFactors.questionMarks,
-            caps: contextualFactors.capsWords,
-            repeatedLetters: contextualFactors.repeatedLetters
-        }
+        processingTime: `${analysisTime}ms`
     });
     
     return result;
@@ -1162,7 +1100,7 @@ function generateMeowVariations(message, count, clientTime = null) {
         let context = 'standard';
         
         // Check for forced sleepy mode first (once per message decision)
-        if (shouldBeSleepy && Math.random() < 0.6) { // 60% of sounds will be sleepy when in sleepy mode
+        if (shouldBeSleepy && Math.random() < 0.2) { // 20% of sounds will be sleepy when in sleepy mode
             soundType = sleepyTiredSounds;
             context = 'sleepy';
         } else {
