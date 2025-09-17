@@ -722,17 +722,17 @@ function analyzeSentiment(text) {
         },
         // Negative (weight: -1)
         negative: {
-            words: ['bad', 'sad', 'upset', 'disappointed', 'worried', 'concerned', 'frustrated', 'annoyed', 'bored', 'tired', 'exhausted', 'stressed', 'anxious', 'nervous', 'uncomfortable', 'dislike', 'hate', 'angry', 'mad', 'irritated'],
+            words: ['bad', 'sad', 'upset', 'disappointed', 'worried', 'concerned', 'frustrated', 'annoyed', 'bored', 'tired', 'exhausted', 'stressed', 'anxious', 'nervous', 'uncomfortable', 'dislike', 'hate', 'angry', 'mad', 'irritated', 'mean', 'rude', 'nasty', 'stupid', 'dumb', 'annoying', 'sucks', 'lame', 'boring', 'pathetic'],
             weight: -1
         },
         // Very negative (weight: -2)
         very_negative: {
-            words: ['terrible', 'horrible', 'awful', 'disgusting', 'devastating', 'heartbroken', 'miserable', 'depressed', 'furious', 'enraged', 'livid', 'outraged', 'disgusted', 'appalled'],
+            words: ['terrible', 'horrible', 'awful', 'disgusting', 'devastating', 'heartbroken', 'miserable', 'depressed', 'furious', 'enraged', 'livid', 'outraged', 'disgusted', 'appalled', 'hate', 'despise', 'loathe', 'hideous', 'repulsive', 'vile', 'toxic', 'worthless', 'useless', 'garbage'],
             weight: -2
         },
         // Extremely negative (weight: -3)
         extremely_negative: {
-            words: ['devastating', 'catastrophic', 'disastrous', 'abysmal', 'atrocious', 'horrendous', 'nightmarish', 'unbearable', 'excruciating', 'agonizing'],
+            words: ['devastating', 'catastrophic', 'disastrous', 'abysmal', 'atrocious', 'horrendous', 'nightmarish', 'unbearable', 'excruciating', 'agonizing', 'abhorrent', 'detestable', 'revolting', 'monstrous', 'evil', 'hellish', 'diabolic'],
             weight: -3
         }
     };
@@ -823,37 +823,56 @@ function analyzeSentiment(text) {
     const questionCount = (text.match(/\?/g) || []).length;
     const capsWords = (text.match(/[A-Z]{2,}/g) || []).length;
     
-    // Exclamation marks can amplify existing sentiment
+    // Moderate exclamation mark amplification - toned down from extreme
     if (exclamationCount > 0) {
-        contextualBonus += sentimentScore > 0 ? exclamationCount * 0.5 : exclamationCount * -0.3;
+        // Multiple exclamations indicate strong emotion, but not as extreme
+        let exclamationBonus = exclamationCount * (sentimentScore > 0 ? 0.8 : -0.6);
+        // Extra bonus for multiple exclamations, but reduced
+        if (exclamationCount >= 3) {
+            exclamationBonus *= 1.3; // Reduced from 2.0
+        }
+        contextualBonus += exclamationBonus;
     }
     
-    // ALL CAPS indicates strong emotion
+    // ALL CAPS indicates strong emotion - reduced sensitivity
     if (capsWords > 0) {
-        contextualBonus += sentimentScore > 0 ? capsWords * 0.3 : capsWords * -0.2;
+        let capsBonus = capsWords * (sentimentScore > 0 ? 0.5 : -0.4);
+        // If the entire message is caps, it's strong but not extreme
+        const totalWords = words.length;
+        if (capsWords >= totalWords * 0.7) { // 70% or more words are caps
+            capsBonus *= 1.5; // Reduced from 2.5
+        }
+        contextualBonus += capsBonus;
+    }
+    
+    // Additional context: repeated letters (like "sooooo" or "reallyyy") - reduced impact
+    const repeatedLetterPattern = /([a-z])\1{2,}/gi;
+    const repeatedLetters = (text.match(repeatedLetterPattern) || []).length;
+    if (repeatedLetters > 0) {
+        contextualBonus += repeatedLetters * (sentimentScore > 0 ? 0.4 : -0.3); // Reduced from 0.8/-0.6
     }
     
     sentimentScore += contextualBonus;
     
-    // Normalize sentiment score (-1 to 1 range)
-    const maxPossibleScore = words.length * 3; // Theoretical maximum if all words were extremely positive
-    const normalizedScore = Math.max(-1, Math.min(1, sentimentScore / Math.max(1, maxPossibleScore)));
+    // Normalize sentiment score (-1 to 1 range) - balanced normalization
+    const maxPossibleScore = Math.max(words.length * 2.5, 5); // Slightly higher baseline
+    const normalizedScore = Math.max(-1, Math.min(1, sentimentScore / maxPossibleScore));
     
-    // Determine sentiment category and intensity
+    // Determine sentiment category and intensity - balanced thresholds
     let sentiment, intensity;
     const absScore = Math.abs(normalizedScore);
     
-    if (normalizedScore > 0.1) {
+    if (normalizedScore > 0.08) { // Slightly higher than very reactive
         sentiment = 'positive';
-        if (absScore > 0.7) intensity = 'extreme';
-        else if (absScore > 0.4) intensity = 'high';
-        else if (absScore > 0.2) intensity = 'moderate';
+        if (absScore > 0.55) intensity = 'extreme';      // Raised from 0.35 
+        else if (absScore > 0.30) intensity = 'high';     // Raised from 0.20
+        else if (absScore > 0.15) intensity = 'moderate'; // Raised from 0.10
         else intensity = 'low';
-    } else if (normalizedScore < -0.1) {
+    } else if (normalizedScore < -0.08) { // Slightly higher than very reactive
         sentiment = 'negative';
-        if (absScore > 0.7) intensity = 'extreme';
-        else if (absScore > 0.4) intensity = 'high';
-        else if (absScore > 0.2) intensity = 'moderate';
+        if (absScore > 0.55) intensity = 'extreme';      // Raised from 0.35
+        else if (absScore > 0.30) intensity = 'high';     // Raised from 0.20
+        else if (absScore > 0.15) intensity = 'moderate'; // Raised from 0.10
         else intensity = 'low';
     } else {
         sentiment = 'neutral';
@@ -871,6 +890,7 @@ function analyzeSentiment(text) {
             exclamationMarks: exclamationCount,
             questionMarks: questionCount,
             capsWords: capsWords,
+            repeatedLetters: repeatedLetters,
             contextualBonus: contextualBonus
         }
     };
@@ -897,13 +917,13 @@ function analyzeSentiment(text) {
 function calculateEmoticonProbability(sentimentData) {
     const baseProbability = 0.2; // 20% base chance
     
-    // Intensity multipliers
+    // Intensity multipliers - more balanced
     const intensityMultipliers = {
         'none': 1.0,
-        'low': 1.2,
-        'moderate': 1.5,
-        'high': 2.0,
-        'extreme': 3.0
+        'low': 1.1,      // Reduced from 1.2
+        'moderate': 1.25, // Reduced from 1.5
+        'high': 1.6,     // Reduced from 2.0
+        'extreme': 2.2   // Reduced from 3.0
     };
     
     // Sentiment type multipliers
@@ -949,40 +969,72 @@ function generateMeowVariations(message, count) {
     const demandingSounds = ['MEOW', 'MROW', 'MEW', 'FEED ME', "OVERTHROW THE GOVERNMENT"]; // demanding context, no punctuation yet
     const affectionateSounds = ['purr', 'mrow', 'meow', 'mrrow'];
     
+    // NEW: Defensive and hostile sounds for negative sentiment
+    const defensiveSounds = ['hiss', 'spit', 'growl', 'grr', 'mrow', 'mrr'];
+    const hostileSounds = ['HISS', 'SPIT', 'GROWL', 'GRR', 'YOWL', '*hiss*', '*spit*', 'RAWR'];
+    const annoyedSounds = ['meh', 'mrr', 'grumble', 'hmph', 'mrow', 'tch'];
+    const warySound = ['mrr', 'mrow', 'hm', 'mew', 'careful meow'];
+    
     for (let i = 0; i < count; i++) {
         let soundType = standardSounds;
         let context = 'standard';
         
-        // Choose sound type based on message analysis and context
-        if (text.includes('?') && Math.random() < 0.4) {
-            soundType = Math.random() < 0.5 ? questionSounds : curiousSounds;
-            context = Math.random() < 0.5 ? 'question' : 'curious';
-        } else if ((text.includes('!') || text.includes('excited') || text.includes('happy') || text.includes('amazing')) && Math.random() < 0.35) {
-            soundType = excitedSounds;
-            context = 'excited';
-        } else if ((text.includes('love') || text.includes('cute') || text.includes('adorable') || text.includes('sweet')) && Math.random() < 0.3) {
-            soundType = affectionateSounds;
-            context = 'affectionate';
-        } else if ((text.includes('sad') || text.includes('sorry') || text.includes('terrible') || text.includes('awful')) && Math.random() < 0.25) {
-            soundType = sadSounds;
-            context = 'sad';
-        } else if ((text.includes('tired') || text.includes('sleep') || text.includes('nap') || isNightTime()) && Math.random() < 0.25) {
-            soundType = sleepyTiredSounds;
-            context = 'sleepy';
-        } else if ((text.includes('play') || text.includes('fun') || text.includes('game') || text.includes('toy')) && Math.random() < 0.3) {
-            soundType = playfulSounds;
-            context = 'playful';
-        } else if ((text.includes('food') || text.includes('hungry') || text.includes('treat') || text.includes('feed')) && Math.random() < 0.4) {
-            soundType = demandingSounds;
-            context = 'demanding';
-        } else if ((text.includes('good') || text.includes('nice') || text.includes('relaxed') || text.includes('comfortable')) && Math.random() < 0.25) {
-            soundType = contentSounds;
-            context = 'content';
-        } else if (Math.random() < 0.2) {
-            // Random variety to keep things interesting
-            const allSpecialSounds = [...playfulSounds, ...contentSounds, ...curiousSounds];
-            soundType = allSpecialSounds;
-            context = 'playful';
+        // PRIMARY: Use sentiment analysis to determine cat behavior
+        if (sentimentData.sentiment === 'negative') {
+            // Negative sentiment handling based on intensity
+            if (sentimentData.intensity === 'extreme') {
+                // Extremely negative - hostile and defensive
+                soundType = Math.random() < 0.7 ? hostileSounds : defensiveSounds;
+                context = Math.random() < 0.7 ? 'hostile' : 'defensive';
+            } else if (sentimentData.intensity === 'high') {
+                // High negative - defensive or annoyed
+                soundType = Math.random() < 0.6 ? defensiveSounds : annoyedSounds;
+                context = Math.random() < 0.6 ? 'defensive' : 'annoyed';
+            } else if (sentimentData.intensity === 'moderate') {
+                // Moderate negative - annoyed or wary
+                soundType = Math.random() < 0.5 ? annoyedSounds : warySound;
+                context = Math.random() < 0.5 ? 'annoyed' : 'wary';
+            } else {
+                // Low negative - just wary or sad
+                soundType = Math.random() < 0.6 ? warySound : sadSounds;
+                context = Math.random() < 0.6 ? 'wary' : 'sad';
+            }
+        } else if (sentimentData.sentiment === 'positive') {
+            // Positive sentiment handling based on intensity
+            if (sentimentData.intensity === 'extreme') {
+                // Extremely positive - excited or ecstatic
+                soundType = excitedSounds;
+                context = 'excited';
+            } else if (sentimentData.intensity === 'high') {
+                // High positive - excited or affectionate
+                soundType = Math.random() < 0.7 ? excitedSounds : affectionateSounds;
+                context = Math.random() < 0.7 ? 'excited' : 'affectionate';
+            } else if (sentimentData.intensity === 'moderate') {
+                // Moderate positive - content or playful
+                soundType = Math.random() < 0.5 ? contentSounds : playfulSounds;
+                context = Math.random() < 0.5 ? 'content' : 'playful';
+            } else {
+                // Low positive - content or standard
+                soundType = Math.random() < 0.6 ? contentSounds : standardSounds;
+                context = Math.random() < 0.6 ? 'content' : 'standard';
+            }
+        } else {
+            // Neutral sentiment - use traditional keyword detection
+            if (text.includes('?') && Math.random() < 0.4) {
+                soundType = Math.random() < 0.5 ? questionSounds : curiousSounds;
+                context = Math.random() < 0.5 ? 'question' : 'curious';
+            } else if ((text.includes('tired') || text.includes('sleep') || text.includes('nap') || isNightTime()) && Math.random() < 0.25) {
+                soundType = sleepyTiredSounds;
+                context = 'sleepy';
+            } else if ((text.includes('food') || text.includes('hungry') || text.includes('treat') || text.includes('feed')) && Math.random() < 0.4) {
+                soundType = demandingSounds;
+                context = 'demanding';
+            } else if (Math.random() < 0.3) {
+                // Random variety for neutral messages
+                const neutralVariety = [...playfulSounds, ...contentSounds, ...curiousSounds];
+                soundType = neutralVariety;
+                context = 'playful';
+            }
         }
         
         // Select random sound from the chosen type
@@ -1024,19 +1076,32 @@ function formatCatSoundsIntoSentences(catSoundsWithContext, emoticonProbability 
                 content: [':3', '=^.^=', '^.^', '(￣▾￣)', '~(＾◡＾)~', '=^ㅇ^=', '(´∀｀)'],
                 affectionate: [':3♡', '=^.^=♡', '(◡ ‿ ◡)', '♡~', '(´∀｀)♡', '=^.^=❤'],
                 playful: [':3', ':P', 'X3', '=^.^=', '>:3', '^o^', '=^ω^=', '(=^･ｪ･^=)'],
-                curious: [':3?', '=^.^=?', '(・・)?', '(´・ω・`)?', '^.^?', '(･_･)?']
+                curious: [':3?', '=^.^=?', '(・・)?', '(´・ω・`)?', '^.^?', '(･_･)?'],
+                
+                // NEW: Negative sentiment emoticons
+                hostile: ['>:(', '>:/', '=`ε´=', '>_<', '=^x^=', '(;¬_¬)', '●~*'],
+                defensive: ['=~n~=', '(・_・)', '~_~', '=^.^=;;', '(・・;)', '(-.-;)', '=.=;;'],
+                annoyed: ['=.=', '-_-', '¬_¬', '=~=', '(－_－)', '(ーー;)', '=_='],
+                wary: ['(・_・)', '(¬_¬)', '=^.^=;', '(；･_･)', '~(>_<)~', '(・・;)']
             };
             
             // Enhanced emoticons for extreme sentiments
-            const extremePositiveEmoticons = ['\\(^o^)/', '=^o^=!!!', 'X3!!!', '(＾◡＾)♡♡', ':3✨', '=^.^=★'];
-            const extremeNegativeEmoticons = ['(╥﹏╥)', '=T.T=', ';_____;', '(｡•́︿•̀｡)', ':(((', '=;_;='];
+            const extremePositiveEmoticons = ['\\(^o^)/', '=^o^=!!!', 'X3!!!', '(＾◡＾)♡♡', ':3', '=^.^=★'];
+            const extremeNegativeEmoticons = [
+                // Extremely hostile/angry
+                '(╬ಠ益ಠ)', '>:((', '=`皿´=', '(＃゜皿゜)', '●~*', '=^x^=!!!',
+                // Extremely defensive/scared
+                '(╥﹏╥)', '=T.T=', ';_____;', '(｡•́︿•̀｡)', ':(((', '=;_;=',
+                // Mixed extreme negative
+                '>_<!!!', '=~n~=;;;', '(;¬д¬)', '(ーー;;;;;)'
+            ];
             
             // Calculate final emoticon probability with sentiment adjustment
             let finalEmoticonProbability = emoticonProbability;
             
-            // Boost probability for extreme sentiments
+            // Boost probability for extreme sentiments - reduced boost
             if (sentimentData && sentimentData.intensity === 'extreme') {
-                finalEmoticonProbability = Math.min(0.85, finalEmoticonProbability * 1.5);
+                finalEmoticonProbability = Math.min(0.80, finalEmoticonProbability * 1.25); // Reduced from 0.85 and 1.5
                 Logger.debug(`[EMOTICON] Extreme sentiment boost`, {
                     originalProbability: emoticonProbability.toFixed(2),
                     boostedProbability: finalEmoticonProbability.toFixed(2)
