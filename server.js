@@ -1153,7 +1153,7 @@ function generateMeowVariations(message, count, clientTime = null) {
     
     // NEW: Defensive and hostile sounds for negative sentiment
     const defensiveSounds = ['hiss', 'spit', 'growl', 'grr', 'mrow', 'mrr'];
-    const hostileSounds = ['HISS', 'SPIT', 'GROWL', 'GRR', 'YOWL', '*hiss*', '*spit*', 'RAWR'];
+    const hostileSounds = ['HISS', 'SPIT', 'GROWL', 'GRR', 'YOWL', '*hiss*', '*spit*'];
     const annoyedSounds = ['meh', 'mrr', 'hmph', 'mrow', 'tch'];
     const warySound = ['mrr', 'mrow', 'hm', 'mew'];
     
