@@ -359,7 +359,7 @@ socket.on('connect', () => {
 });
 
 // Initialize
-console.log('🐱 CatGPT initialized! Ready to meow at your service!');
+console.log('🐱 CatGPT initialized!');
 
 // Audio Library and "Speak It" Feature
 let audioLibrary = null;
