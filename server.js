@@ -1413,21 +1413,36 @@ server.listen(PORT, () => {
 });
 
 // Graceful shutdown handling
-process.on('SIGTERM', () => {
-    Logger.info('SIGTERM received, shutting down gracefully...');
-    server.close(() => {
-        Logger.info('Server closed successfully');
-        process.exit(0);
-    });
-});
+let isShuttingDown = false;
 
-process.on('SIGINT', () => {
-    Logger.info('SIGINT received, shutting down gracefully...');
-    server.close(() => {
+function gracefulShutdown(signal) {
+    if (isShuttingDown) {
+        Logger.warn(`${signal} received again, forcing exit...`);
+        process.exit(1);
+    }
+    
+    isShuttingDown = true;
+    Logger.info(`${signal} received, shutting down gracefully...`);
+    
+    // Set a timeout to force exit if graceful shutdown takes too long
+    const forceExitTimeout = setTimeout(() => {
+        Logger.error('Graceful shutdown timed out, forcing exit...');
+        process.exit(1);
+    }, 5000); // 5 seconds timeout
+    
+    server.close((err) => {
+        clearTimeout(forceExitTimeout);
+        if (err) {
+            Logger.error('Error during server shutdown:', err);
+            process.exit(1);
+        }
         Logger.info('Server closed successfully');
         process.exit(0);
     });
-});
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Error handling
 process.on('uncaughtException', (error) => {
