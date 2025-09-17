@@ -429,30 +429,48 @@ function analyzePromptComplexity(message) {
     const text = message.toLowerCase();
     const config = COMPLEXITY_CONFIG;
     
-    console.log(`\n=== Analyzing: "${message}" ===`);
+    const analysisId = Math.random().toString(36).substr(2, 6);
+    Logger.debug(`[COMPLEXITY:${analysisId}] Starting analysis`, {
+        message: message.length > 50 ? message.substring(0, 50) + '...' : message,
+        messageLength: message.length
+    });
     
     // Dynamic base score from message length
     const lengthScore = Math.min(text.length / config.scoring.lengthDivisor, config.scoring.maxLengthScore);
     score += lengthScore;
-    console.log(`Length score: ${lengthScore.toFixed(1)} (length: ${text.length})`);
+    Logger.debug(`[COMPLEXITY:${analysisId}] Length analysis`, {
+        lengthScore: lengthScore.toFixed(1),
+        textLength: text.length
+    });
     
     // Semantic complexity analysis
     const semanticAnalysis = detectSemanticComplexity(text);
     score += semanticAnalysis.score;
     if (semanticAnalysis.score > 0) {
-        console.log(`Semantic complexity: +${semanticAnalysis.score} (relationships: ${semanticAnalysis.details.relationshipCount}, abstract: ${semanticAnalysis.details.abstractCount}, quantitative: ${semanticAnalysis.details.quantitativeCount})`);
+        Logger.debug(`[COMPLEXITY:${analysisId}] Semantic complexity`, {
+            score: semanticAnalysis.score,
+            relationships: semanticAnalysis.details.relationshipCount,
+            abstract: semanticAnalysis.details.abstractCount,
+            quantitative: semanticAnalysis.details.quantitativeCount
+        });
     }
     
     // Structural complexity analysis
     const structuralAnalysis = analyzeTextStructure(text);
     score += structuralAnalysis.score;
     if (structuralAnalysis.score > 0) {
-        console.log(`Structural complexity: +${structuralAnalysis.score.toFixed(1)} (commas: ${structuralAnalysis.details.commaCount}, semicolons: ${structuralAnalysis.details.semicolonCount}, colons: ${structuralAnalysis.details.colonCount})`);
+        Logger.debug(`[COMPLEXITY:${analysisId}] Structural complexity`, {
+            score: structuralAnalysis.score.toFixed(1),
+            commas: structuralAnalysis.details.commaCount,
+            semicolons: structuralAnalysis.details.semicolonCount,
+            colons: structuralAnalysis.details.colonCount
+        });
     }
     
     // Dynamic pattern-based detection
     let patternScore = 0;
     const matchedCategories = new Set();
+    const patternMatches = [];
     
     config.patterns.forEach(pattern => {
         if (pattern.regex.test(text)) {
@@ -460,15 +478,31 @@ function analyzePromptComplexity(message) {
             const adjustedScore = Math.round(pattern.baseScore * categoryMultiplier);
             patternScore += adjustedScore;
             matchedCategories.add(pattern.category);
-            console.log(`Pattern match: ${pattern.type} (+${adjustedScore}, base: ${pattern.baseScore}, multiplier: ${categoryMultiplier.toFixed(2)})`);
+            patternMatches.push({
+                type: pattern.type,
+                score: adjustedScore,
+                baseScore: pattern.baseScore,
+                multiplier: categoryMultiplier.toFixed(2)
+            });
         }
     });
+    
+    if (patternMatches.length > 0) {
+        Logger.debug(`[COMPLEXITY:${analysisId}] Pattern matches`, {
+            totalPatternScore: patternScore,
+            matches: patternMatches
+        });
+    }
     
     // Category combination bonus
     const categoryBonus = calculateDynamicCategoryBonus(matchedCategories, config.categoryMultipliers);
     if (categoryBonus > 0) {
         patternScore += categoryBonus;
-        console.log(`Category combination bonus: +${categoryBonus} (${matchedCategories.size} categories)`);
+        Logger.debug(`[COMPLEXITY:${analysisId}] Category combination bonus`, {
+            bonus: categoryBonus,
+            categoriesCount: matchedCategories.size,
+            categories: Array.from(matchedCategories)
+        });
     }
     
     score += patternScore;
@@ -476,6 +510,7 @@ function analyzePromptComplexity(message) {
     // Dynamic keyword scoring with category awareness
     let keywordScore = 0;
     const keywordMatches = {};
+    const keywordResults = [];
     
     Object.entries(config.keywordCategories).forEach(([category, categoryConfig]) => {
         keywordMatches[category] = [];
@@ -493,26 +528,43 @@ function analyzePromptComplexity(message) {
             const adjustedScore = Math.round(categoryConfig.baseScore * categoryMultiplier * totalKeywords * diminishingFactor);
             
             keywordScore += adjustedScore;
-            console.log(`${category} keywords (${totalKeywords}): ${keywordMatches[category].join(', ')} (+${adjustedScore}, diminishing: ${diminishingFactor.toFixed(2)})`);
+            keywordResults.push({
+                category: category,
+                keywords: keywordMatches[category],
+                count: totalKeywords,
+                score: adjustedScore,
+                diminishingFactor: diminishingFactor.toFixed(2)
+            });
         }
     });
+    
+    if (keywordResults.length > 0) {
+        Logger.debug(`[COMPLEXITY:${analysisId}] Keyword analysis`, {
+            totalKeywordScore: keywordScore,
+            categoryMatches: keywordResults
+        });
+    }
     
     // Dynamic punctuation scoring
     const questionMarks = (text.match(/\?/g) || []).length;
     const questionScore = questionMarks * config.scoring.questionMultiplier;
     score += questionScore;
-    console.log(`Question score: ${questionScore} (${questionMarks} question marks)`);
     
     const exclamationMarks = (text.match(/!/g) || []).length;
     const excitationScore = exclamationMarks * config.scoring.exclamationMultiplier;
     score += excitationScore;
-    console.log(`Excitation score: ${excitationScore} (${exclamationMarks} exclamation marks)`);
+    
+    Logger.debug(`[COMPLEXITY:${analysisId}] Punctuation analysis`, {
+        questionScore: questionScore,
+        questionMarks: questionMarks,
+        excitationScore: excitationScore,
+        exclamationMarks: exclamationMarks
+    });
     
     // Dynamic sentence complexity
     const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0).length;
     const sentenceScore = Math.max(0, (sentences - 1) * config.scoring.sentenceMultiplier);
     score += sentenceScore;
-    console.log(`Sentence score: ${sentenceScore} (${sentences} sentences)`);
     
     // Dynamic word complexity analysis
     const words = text.split(/\s+/);
@@ -522,46 +574,93 @@ function analyzePromptComplexity(message) {
     }).length;
     const complexWordScore = complexWords * config.scoring.complexWordMultiplier;
     score += complexWordScore;
-    console.log(`Complex words score: ${complexWordScore.toFixed(1)} (${complexWords} complex words)`);
+    
+    Logger.debug(`[COMPLEXITY:${analysisId}] Text structure analysis`, {
+        sentenceScore: sentenceScore,
+        sentenceCount: sentences,
+        complexWordScore: complexWordScore.toFixed(1),
+        complexWordCount: complexWords
+    });
     
     // Dynamic reduction scoring
     let reductionScore = 0;
+    const reductionMatches = [];
     Object.entries(config.reductionRules).forEach(([ruleName, rule]) => {
         rule.words.forEach(word => {
             if (text === word || text === word + '!') {
                 reductionScore += rule.penalty;
-                console.log(`${ruleName}: "${word}" (${rule.penalty})`);
+                reductionMatches.push({
+                    rule: ruleName,
+                    word: word,
+                    penalty: rule.penalty
+                });
             }
         });
     });
     
     score += keywordScore + reductionScore;
-    console.log(`Keyword score: ${keywordScore}, Reduction score: ${reductionScore}`);
+    
+    if (reductionMatches.length > 0) {
+        Logger.debug(`[COMPLEXITY:${analysisId}] Reduction analysis`, {
+            totalReduction: reductionScore,
+            matches: reductionMatches
+        });
+    }
     
     // Dynamic time-based adjustment
     const hour = new Date().getHours();
     let timeScore = 0;
+    let timeAdjustment = null;
     config.timeAdjustments.forEach(adjustment => {
         const [start, end] = adjustment.hourRange;
         if ((start <= end && hour >= start && hour <= end) || 
             (start > end && (hour >= start || hour <= end))) {
             timeScore = adjustment.score;
-            console.log(`Time-based score: ${timeScore} (hour: ${hour}, ${adjustment.description})`);
+            timeAdjustment = adjustment;
         }
     });
     score += timeScore;
+    
+    if (timeAdjustment) {
+        Logger.debug(`[COMPLEXITY:${analysisId}] Time-based adjustment`, {
+            timeScore: timeScore,
+            currentHour: hour,
+            description: timeAdjustment.description
+        });
+    }
     
     // Adaptive scoring adjustment
     const categoryContext = Array.from(matchedCategories);
     const adaptiveScore = adaptiveScoring(score, text.length, categoryContext);
     if (adaptiveScore !== score) {
-        console.log(`Adaptive adjustment: ${score} -> ${adaptiveScore} (length: ${text.length}, categories: ${categoryContext.join(', ')})`);
+        Logger.debug(`[COMPLEXITY:${analysisId}] Adaptive adjustment`, {
+            originalScore: score,
+            adaptiveScore: adaptiveScore,
+            textLength: text.length,
+            categories: categoryContext
+        });
         score = adaptiveScore;
     }
     
     // Apply final constraints
     const finalScore = Math.max(config.scoring.minScore, Math.min(config.scoring.maxScore, Math.round(score)));
-    console.log(`Final complexity score: ${finalScore}`);
+    
+    Logger.debug(`[COMPLEXITY:${analysisId}] Final result`, {
+        finalScore: finalScore,
+        breakdown: {
+            length: lengthScore.toFixed(1),
+            semantic: semanticAnalysis.score,
+            structural: structuralAnalysis.score.toFixed(1),
+            patterns: patternScore,
+            keywords: keywordScore,
+            punctuation: questionScore + excitationScore,
+            sentences: sentenceScore,
+            complexWords: complexWordScore.toFixed(1),
+            reductions: reductionScore,
+            timeAdjustment: timeScore,
+            adaptive: adaptiveScore !== score ? `${score} → ${adaptiveScore}` : 'none'
+        }
+    });
     
     return finalScore;
 }
@@ -600,8 +699,241 @@ function calculateMeowCount(complexity) {
     return meowCount;
 }
 
+// Sentiment Analysis System
+function analyzeSentiment(text) {
+    const normalizedText = text.toLowerCase();
+    
+    // Sentiment lexicon with intensity weights
+    const sentimentWords = {
+        // Extremely positive (weight: 3)
+        extremely_positive: {
+            words: ['amazing', 'fantastic', 'incredible', 'wonderful', 'brilliant', 'outstanding', 'perfect', 'excellent', 'spectacular', 'marvelous', 'fabulous', 'superb', 'magnificent', 'extraordinary', 'phenomenal'],
+            weight: 3
+        },
+        // Very positive (weight: 2)
+        very_positive: {
+            words: ['great', 'awesome', 'lovely', 'beautiful', 'exciting', 'excited', 'thrilled', 'delighted', 'overjoyed', 'ecstatic', 'elated', 'jubilant', 'euphoric', 'blissful'],
+            weight: 2
+        },
+        // Positive (weight: 1)
+        positive: {
+            words: ['good', 'nice', 'happy', 'glad', 'pleased', 'content', 'satisfied', 'cheerful', 'joyful', 'optimistic', 'positive', 'comfortable', 'relaxed', 'calm', 'peaceful', 'cute', 'adorable', 'sweet', 'fun', 'enjoyable', 'pleasant', 'love', 'like', 'appreciate', 'thank', 'thanks'],
+            weight: 1
+        },
+        // Negative (weight: -1)
+        negative: {
+            words: ['bad', 'sad', 'upset', 'disappointed', 'worried', 'concerned', 'frustrated', 'annoyed', 'bored', 'tired', 'exhausted', 'stressed', 'anxious', 'nervous', 'uncomfortable', 'dislike', 'hate', 'angry', 'mad', 'irritated'],
+            weight: -1
+        },
+        // Very negative (weight: -2)
+        very_negative: {
+            words: ['terrible', 'horrible', 'awful', 'disgusting', 'devastating', 'heartbroken', 'miserable', 'depressed', 'furious', 'enraged', 'livid', 'outraged', 'disgusted', 'appalled'],
+            weight: -2
+        },
+        // Extremely negative (weight: -3)
+        extremely_negative: {
+            words: ['devastating', 'catastrophic', 'disastrous', 'abysmal', 'atrocious', 'horrendous', 'nightmarish', 'unbearable', 'excruciating', 'agonizing'],
+            weight: -3
+        }
+    };
+    
+    // Intensity modifiers
+    const intensifiers = {
+        very: 1.5,
+        really: 1.4,
+        extremely: 2.0,
+        incredibly: 1.8,
+        absolutely: 1.7,
+        totally: 1.6,
+        completely: 1.8,
+        quite: 1.2,
+        rather: 1.1,
+        somewhat: 0.8,
+        slightly: 0.6,
+        barely: 0.4,
+        hardly: 0.3
+    };
+    
+    // Negation words
+    const negationWords = ['not', 'no', 'never', 'nothing', 'nowhere', 'nobody', 'none', 'neither', 'nor', 'cannot', "can't", "won't", "shouldn't", "wouldn't", "couldn't", "doesn't", "don't", "isn't", "aren't", "wasn't", "weren't"];
+    
+    let sentimentScore = 0;
+    let wordCount = 0;
+    let matchedWords = [];
+    
+    const words = normalizedText.split(/\s+/);
+    
+    for (let i = 0; i < words.length; i++) {
+        const word = words[i].replace(/[^\w]/g, ''); // Remove punctuation
+        let currentWordSentiment = 0;
+        let matchedCategory = null;
+        
+        // Check sentiment words
+        for (const [category, config] of Object.entries(sentimentWords)) {
+            if (config.words.includes(word)) {
+                currentWordSentiment = config.weight;
+                matchedCategory = category;
+                break;
+            }
+        }
+        
+        if (currentWordSentiment !== 0) {
+            // Check for intensifiers before this word
+            let intensifierMultiplier = 1.0;
+            if (i > 0) {
+                const prevWord = words[i - 1].replace(/[^\w]/g, '');
+                if (intensifiers[prevWord]) {
+                    intensifierMultiplier = intensifiers[prevWord];
+                }
+            }
+            
+            // Check for negation in the previous 3 words
+            let isNegated = false;
+            for (let j = Math.max(0, i - 3); j < i; j++) {
+                const prevWord = words[j].replace(/[^\w]/g, '');
+                if (negationWords.includes(prevWord)) {
+                    isNegated = true;
+                    break;
+                }
+            }
+            
+            // Apply modifiers
+            let finalSentiment = currentWordSentiment * intensifierMultiplier;
+            if (isNegated) {
+                finalSentiment *= -1; // Flip sentiment if negated
+            }
+            
+            sentimentScore += finalSentiment;
+            wordCount++;
+            
+            matchedWords.push({
+                word: word,
+                category: matchedCategory,
+                baseScore: currentWordSentiment,
+                intensifier: intensifierMultiplier,
+                negated: isNegated,
+                finalScore: finalSentiment
+            });
+        }
+    }
+    
+    // Calculate contextual sentiment based on punctuation and structure
+    let contextualBonus = 0;
+    const exclamationCount = (text.match(/!/g) || []).length;
+    const questionCount = (text.match(/\?/g) || []).length;
+    const capsWords = (text.match(/[A-Z]{2,}/g) || []).length;
+    
+    // Exclamation marks can amplify existing sentiment
+    if (exclamationCount > 0) {
+        contextualBonus += sentimentScore > 0 ? exclamationCount * 0.5 : exclamationCount * -0.3;
+    }
+    
+    // ALL CAPS indicates strong emotion
+    if (capsWords > 0) {
+        contextualBonus += sentimentScore > 0 ? capsWords * 0.3 : capsWords * -0.2;
+    }
+    
+    sentimentScore += contextualBonus;
+    
+    // Normalize sentiment score (-1 to 1 range)
+    const maxPossibleScore = words.length * 3; // Theoretical maximum if all words were extremely positive
+    const normalizedScore = Math.max(-1, Math.min(1, sentimentScore / Math.max(1, maxPossibleScore)));
+    
+    // Determine sentiment category and intensity
+    let sentiment, intensity;
+    const absScore = Math.abs(normalizedScore);
+    
+    if (normalizedScore > 0.1) {
+        sentiment = 'positive';
+        if (absScore > 0.7) intensity = 'extreme';
+        else if (absScore > 0.4) intensity = 'high';
+        else if (absScore > 0.2) intensity = 'moderate';
+        else intensity = 'low';
+    } else if (normalizedScore < -0.1) {
+        sentiment = 'negative';
+        if (absScore > 0.7) intensity = 'extreme';
+        else if (absScore > 0.4) intensity = 'high';
+        else if (absScore > 0.2) intensity = 'moderate';
+        else intensity = 'low';
+    } else {
+        sentiment = 'neutral';
+        intensity = 'none';
+    }
+    
+    const result = {
+        sentiment: sentiment,
+        intensity: intensity,
+        score: normalizedScore,
+        rawScore: sentimentScore,
+        wordsAnalyzed: wordCount,
+        matchedWords: matchedWords,
+        contextualFactors: {
+            exclamationMarks: exclamationCount,
+            questionMarks: questionCount,
+            capsWords: capsWords,
+            contextualBonus: contextualBonus
+        }
+    };
+    
+    Logger.debug(`[SENTIMENT] Analysis complete`, {
+        message: text.length > 30 ? text.substring(0, 30) + '...' : text,
+        sentiment: sentiment,
+        intensity: intensity,
+        score: normalizedScore.toFixed(3),
+        wordsAnalyzed: wordCount,
+        keyWords: matchedWords.length > 0 ? matchedWords.map(w => `${w.word}(${w.finalScore.toFixed(1)})`).join(', ') : 'none',
+        contextual: {
+            exclamations: exclamationCount,
+            questions: questionCount,
+            caps: capsWords,
+            bonus: contextualBonus.toFixed(1)
+        }
+    });
+    
+    return result;
+}
+
+// Calculate emoticon probability based on sentiment
+function calculateEmoticonProbability(sentimentData) {
+    const baseProbability = 0.2; // 20% base chance
+    
+    // Intensity multipliers
+    const intensityMultipliers = {
+        'none': 1.0,
+        'low': 1.2,
+        'moderate': 1.5,
+        'high': 2.0,
+        'extreme': 3.0
+    };
+    
+    // Sentiment type multipliers
+    let sentimentMultiplier = 1.0;
+    if (sentimentData.sentiment === 'positive' || sentimentData.sentiment === 'negative') {
+        sentimentMultiplier = 1.5; // Emotional content gets more emoticons
+    }
+    
+    const intensityMultiplier = intensityMultipliers[sentimentData.intensity] || 1.0;
+    const finalProbability = Math.min(0.8, baseProbability * sentimentMultiplier * intensityMultiplier);
+    
+    Logger.debug(`[EMOTICON] Probability calculated`, {
+        sentiment: sentimentData.sentiment,
+        intensity: sentimentData.intensity,
+        baseProbability: baseProbability,
+        sentimentMultiplier: sentimentMultiplier,
+        intensityMultiplier: intensityMultiplier,
+        finalProbability: finalProbability.toFixed(2)
+    });
+    
+    return finalProbability;
+}
+
 function generateMeowVariations(message, count) {
     const text = message.toLowerCase();
+    
+    // Analyze sentiment for emoticon probability calculation
+    const sentimentData = analyzeSentiment(message);
+    const emoticonProbability = calculateEmoticonProbability(sentimentData);
+    
     const catSoundsWithContext = [];
     
     // Expanded variety of cat sounds with different emotional contexts
@@ -658,10 +990,10 @@ function generateMeowVariations(message, count) {
         catSoundsWithContext.push({ sound: selectedSound, context: context });
     }
     
-    return formatCatSoundsIntoSentences(catSoundsWithContext);
+    return formatCatSoundsIntoSentences(catSoundsWithContext, emoticonProbability, sentimentData);
 }
 
-function formatCatSoundsIntoSentences(catSoundsWithContext) {
+function formatCatSoundsIntoSentences(catSoundsWithContext, emoticonProbability = 0.2, sentimentData = null) {
     // Group cat sounds into sentences with proper punctuation
     const sentences = [];
     let currentSentence = [];
@@ -681,26 +1013,63 @@ function formatCatSoundsIntoSentences(catSoundsWithContext) {
         const isLastSound = i === catSoundsWithContext.length - 1;
         
         if (currentSentence.length >= sentenceLength || isLastSound) {
-            // Cat emoticons organized by context
+            // Enhanced cat emoticons organized by context with sentiment variations
             const catEmoticons = {
                 standard: [':3', ':>', '=^.^=', '^.^', '~(＾◡＾)~'],
-                question: [':3?', ':>?', '=^.^=?', '^.^?', '(・・)?'],
-                excited: [':3!', 'X3', '=^o^=', '^o^', '>:3'],
-                demanding: ['>:3', '>:(', '=^x^=', '(>_<)', '~(>_<)~'],
-                sad: [':(', ':c', ';-;'],
-                sleepy: ['=.=', '-.-', '=~.~=', '(-.-)', 'zzz :3'],
-                content: [':3', '=^.^=', '^.^', '(￣▾￣)', '~(＾◡＾)~'],
-                affectionate: [':3♡', '=^.^=♡'],
-                playful: [':3', ':P', 'X3', '=^.^=', '>:3', '^o^'],
-                curious: [':3?', '=^.^=?', '(・・)?', '(´・ω・`)?', '^.^?']
+                question: [':3?', ':>?', '=^.^=?', '^.^?', '(・・)?', '(´・ω・`)?'],
+                excited: [':3!', 'X3', '=^o^=', '^o^', '>:3', '(＾◡＾)', ':D', '=^_^=!'],
+                demanding: ['>:3', '>:(', '=^x^=', '(>_<)', '~(>_<)~', '>:/', '=^o^=!'],
+                sad: [':(', ':c', ';-;', '(╥﹏╥)', '=T.T=', ';_;', '(｡•́︿•̀｡)'],
+                sleepy: ['=.=', '-.-', '=~.~=', '(-.-)', 'zzz :3', '(－_－) zzZ', '=.= zzz'],
+                content: [':3', '=^.^=', '^.^', '(￣▾￣)', '~(＾◡＾)~', '=^ㅇ^=', '(´∀｀)'],
+                affectionate: [':3♡', '=^.^=♡', '(◡ ‿ ◡)', '♡~', '(´∀｀)♡', '=^.^=❤'],
+                playful: [':3', ':P', 'X3', '=^.^=', '>:3', '^o^', '=^ω^=', '(=^･ｪ･^=)'],
+                curious: [':3?', '=^.^=?', '(・・)?', '(´・ω・`)?', '^.^?', '(･_･)?']
             };
             
-            // 20% chance to use cat emoticons instead of regular punctuation
+            // Enhanced emoticons for extreme sentiments
+            const extremePositiveEmoticons = ['\\(^o^)/', '=^o^=!!!', 'X3!!!', '(＾◡＾)♡♡', ':3✨', '=^.^=★'];
+            const extremeNegativeEmoticons = ['(╥﹏╥)', '=T.T=', ';_____;', '(｡•́︿•̀｡)', ':(((', '=;_;='];
+            
+            // Calculate final emoticon probability with sentiment adjustment
+            let finalEmoticonProbability = emoticonProbability;
+            
+            // Boost probability for extreme sentiments
+            if (sentimentData && sentimentData.intensity === 'extreme') {
+                finalEmoticonProbability = Math.min(0.85, finalEmoticonProbability * 1.5);
+                Logger.debug(`[EMOTICON] Extreme sentiment boost`, {
+                    originalProbability: emoticonProbability.toFixed(2),
+                    boostedProbability: finalEmoticonProbability.toFixed(2)
+                });
+            }
+            
+            // Use sentiment-based emoticon probability instead of fixed 20%
             let punctuation;
-            if (Math.random() < 0.2 && catEmoticons[sentenceContext]) {
+            const useEmoticon = Math.random() < finalEmoticonProbability;
+            
+            if (useEmoticon && catEmoticons[sentenceContext]) {
+                let selectedEmoticons = catEmoticons[sentenceContext];
+                
+                // Override with extreme emoticons for extreme sentiments
+                if (sentimentData && sentimentData.intensity === 'extreme') {
+                    if (sentimentData.sentiment === 'positive') {
+                        // Mix extreme positive with context-appropriate ones
+                        selectedEmoticons = [...extremePositiveEmoticons, ...selectedEmoticons];
+                    } else if (sentimentData.sentiment === 'negative') {
+                        // Mix extreme negative with context-appropriate ones
+                        selectedEmoticons = [...extremeNegativeEmoticons, ...selectedEmoticons];
+                    }
+                }
+                
                 // Use cat emoticon for this context
-                const emoticons = catEmoticons[sentenceContext];
-                punctuation = ' ' + emoticons[Math.floor(Math.random() * emoticons.length)];
+                punctuation = ' ' + selectedEmoticons[Math.floor(Math.random() * selectedEmoticons.length)];
+                
+                Logger.debug(`[EMOTICON] Selected emoticon`, {
+                    emoticon: punctuation.trim(),
+                    context: sentenceContext,
+                    sentiment: sentimentData ? `${sentimentData.sentiment}/${sentimentData.intensity}` : 'unknown',
+                    probability: finalEmoticonProbability.toFixed(2)
+                });
             } else {
                 // Use regular punctuation
                 punctuation = '.';
@@ -710,6 +1079,15 @@ function formatCatSoundsIntoSentences(catSoundsWithContext) {
                     punctuation = '!';
                 } else if (sentenceContext === 'sad' || sentenceContext === 'sleepy') {
                     punctuation = '...';
+                }
+                
+                // Add extra punctuation for extreme sentiments
+                if (sentimentData && sentimentData.intensity === 'extreme') {
+                    if (sentimentData.sentiment === 'positive' && punctuation === '!') {
+                        punctuation = '!!!';
+                    } else if (sentimentData.sentiment === 'negative' && punctuation === '...') {
+                        punctuation = '......';
+                    }
                 }
             }
             
