@@ -81,9 +81,19 @@ function sendMessage() {
         hasMessages = true;
     }
     
+    // Get client's local time information
+    const now = new Date();
+    const clientTimeInfo = {
+        hour: now.getHours(),
+        minute: now.getMinutes(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timestamp: now.toISOString()
+    };
+    
     socket.emit('send-message', {
         message: message,
-        conversationId: conversationId
+        conversationId: conversationId,
+        clientTime: clientTimeInfo
     });
     
     messageInput.value = '';

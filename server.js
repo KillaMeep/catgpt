@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
+const natural = require('natural');
 
 const app = express();
 const server = http.createServer(app);
@@ -179,10 +180,10 @@ function calculateTokenizerDelay(token, position, totalTokens, complexity) {
 }
 
 // Analyze user input and generate contextual cat sound response
-function generateMeowResponse(userMessage) {
+function generateMeowResponse(userMessage, clientTime = null) {
     let complexity = analyzePromptComplexity(userMessage);
     let meowCount = calculateMeowCount(complexity);
-    let catSounds = generateMeowVariations(userMessage, meowCount);
+    let catSounds = generateMeowVariations(userMessage, meowCount, clientTime);
     
     return catSounds;
 }
@@ -699,8 +700,165 @@ function calculateMeowCount(complexity) {
     return meowCount;
 }
 
-// Sentiment Analysis System
+// Enhanced Sentiment Analysis using Natural.js
+function analyzeSentimentWithNatural(text) {
+    const startTime = Date.now();
+    
+    // Use Natural's simple sentiment analysis approach
+    const tokenizer = new natural.WordTokenizer();
+    const tokens = tokenizer.tokenize(text.toLowerCase());
+    
+    // Calculate sentiment using a simple word-based approach with Natural's tools
+    let sentimentScore = 0;
+    let analyzedWords = 0;
+    
+    // Basic positive/negative word lists that work well with Natural
+    const positiveWords = ['good', 'great', 'awesome', 'amazing', 'love', 'like', 'happy', 'wonderful', 'excellent', 'fantastic', 'perfect', 'beautiful', 'nice', 'cute', 'adorable', 'sweet', 'fun', 'exciting', 'brilliant', 'superb'];
+    const negativeWords = ['bad', 'terrible', 'awful', 'hate', 'horrible', 'disgusting', 'stupid', 'annoying', 'boring', 'sad', 'angry', 'frustrated', 'disappointed', 'upset', 'worried', 'stressed', 'mean', 'rude', 'nasty', 'pathetic'];
+    
+    tokens.forEach(token => {
+        const stemmed = natural.PorterStemmer.stem(token);
+        const originalToken = token;
+        
+        if (positiveWords.includes(originalToken) || positiveWords.includes(stemmed)) {
+            sentimentScore += 1;
+            analyzedWords++;
+        } else if (negativeWords.includes(originalToken) || negativeWords.includes(stemmed)) {
+            sentimentScore -= 1;
+            analyzedWords++;
+        }
+    });
+    
+    // Normalize score based on word count
+    const normalizedScore = analyzedWords > 0 ? sentimentScore / analyzedWords : 0;
+    
+    // Analyze contextual factors for enhanced accuracy
+    const contextualFactors = {
+        exclamationMarks: (text.match(/!/g) || []).length,
+        questionMarks: (text.match(/\?/g) || []).length,
+        capsWords: (text.match(/[A-Z]{2,}/g) || []).length,
+        repeatedLetters: (text.match(/([a-z])\1{2,}/gi) || []).length,
+        textLength: text.length,
+        wordCount: tokens.length
+    };
+    
+    // Enhance Natural's score with contextual amplification
+    let enhancedScore = normalizedScore;
+    
+    // Amplify based on exclamation marks (moderate amplification)
+    if (contextualFactors.exclamationMarks > 0) {
+        // For positive sentiment, exclamations boost it
+        // For neutral/negative, we need to be more careful
+        if (enhancedScore >= 0) {
+            const exclamationMultiplier = 1 + (contextualFactors.exclamationMarks * 0.3);
+            enhancedScore *= exclamationMultiplier;
+        } else {
+            // For negative sentiment, exclamations might indicate intensity, not positivity
+            const exclamationMultiplier = 1 + (contextualFactors.exclamationMarks * 0.2);
+            enhancedScore *= exclamationMultiplier;
+        }
+    }
+    
+    // Amplify based on caps words
+    if (contextualFactors.capsWords > 0) {
+        const capsMultiplier = 1 + (contextualFactors.capsWords * 0.2);
+        enhancedScore *= capsMultiplier;
+    }
+    
+    // Amplify based on repeated letters (enthusiasm indicators)
+    if (contextualFactors.repeatedLetters > 0) {
+        if (enhancedScore >= 0) {
+            const repeatMultiplier = 1 + (contextualFactors.repeatedLetters * 0.15);
+            enhancedScore *= repeatMultiplier;
+        }
+    }
+    
+    // Special handling for greetings and friendly words
+    const friendlyWords = ['hey', 'hi', 'hello', 'kitty', 'cat', 'meow'];
+    const hasFriendlyWords = tokens.some(token => friendlyWords.includes(token));
+    
+    if (hasFriendlyWords && enhancedScore >= -0.1) {
+        // Boost neutral/slightly negative greetings to positive
+        enhancedScore = Math.max(0.2, enhancedScore + 0.3);
+    }
+    
+    // Normalize enhanced score to -1 to 1 range
+    enhancedScore = Math.max(-1, Math.min(1, enhancedScore));
+    
+    // Determine sentiment category and intensity
+    let sentiment, intensity;
+    const absScore = Math.abs(enhancedScore);
+    
+    if (enhancedScore > 0.05) {
+        sentiment = 'positive';
+        if (absScore > 0.6) intensity = 'extreme';
+        else if (absScore > 0.35) intensity = 'high';
+        else if (absScore > 0.15) intensity = 'moderate';
+        else intensity = 'low';
+    } else if (enhancedScore < -0.05) {
+        sentiment = 'negative';
+        if (absScore > 0.6) intensity = 'extreme';
+        else if (absScore > 0.35) intensity = 'high';
+        else if (absScore > 0.15) intensity = 'moderate';
+        else intensity = 'low';
+    } else {
+        sentiment = 'neutral';
+        intensity = 'none';
+    }
+    
+    const analysisTime = Date.now() - startTime;
+    
+    const result = {
+        sentiment: sentiment,
+        intensity: intensity,
+        score: enhancedScore,
+        naturalScore: normalizedScore,
+        tokensAnalyzed: tokens.length,
+        wordsAnalyzed: analyzedWords,
+        contextualFactors: contextualFactors,
+        analysisMethod: 'natural-enhanced',
+        processingTime: analysisTime
+    };
+    
+    Logger.debug(`[SENTIMENT-NATURAL] Analysis complete`, {
+        message: text.length > 50 ? text.substring(0, 50) + '...' : text,
+        messageLength: text.length,
+        sentiment: sentiment,
+        intensity: intensity,
+        enhancedScore: enhancedScore.toFixed(3),
+        naturalScore: normalizedScore.toFixed(3),
+        tokensAnalyzed: tokens.length,
+        wordsAnalyzed: analyzedWords,
+        processingTime: `${analysisTime}ms`,
+        contextual: {
+            exclamations: contextualFactors.exclamationMarks,
+            questions: contextualFactors.questionMarks,
+            caps: contextualFactors.capsWords,
+            repeatedLetters: contextualFactors.repeatedLetters
+        }
+    });
+    
+    return result;
+}
+
+// Main sentiment analysis function with fallback
 function analyzeSentiment(text) {
+    try {
+        // Try using Natural.js first (more accurate)
+        return analyzeSentimentWithNatural(text);
+    } catch (error) {
+        Logger.warn(`[SENTIMENT] Natural.js analysis failed, using fallback`, {
+            error: error.message,
+            text: text.length > 30 ? text.substring(0, 30) + '...' : text
+        });
+        
+        // Fallback to original lexicon-based method
+        return analyzeSentimentFallback(text);
+    }
+}
+
+// Fallback sentiment analysis (original lexicon-based method)
+function analyzeSentimentFallback(text) {
     const normalizedText = text.toLowerCase();
     
     // Sentiment lexicon with intensity weights
@@ -896,7 +1054,9 @@ function analyzeSentiment(text) {
     };
     
     Logger.debug(`[SENTIMENT] Analysis complete`, {
-        message: text.length > 30 ? text.substring(0, 30) + '...' : text,
+        message: text.length > 50 ? text.substring(0, 50) + '...' : text,
+        messageLength: text.length,
+        totalWordsProcessed: words.length,
         sentiment: sentiment,
         intensity: intensity,
         score: normalizedScore.toFixed(3),
@@ -947,7 +1107,7 @@ function calculateEmoticonProbability(sentimentData) {
     return finalProbability;
 }
 
-function generateMeowVariations(message, count) {
+function generateMeowVariations(message, count, clientTime = null) {
     const text = message.toLowerCase();
     
     // Analyze sentiment for emoticon probability calculation
@@ -955,6 +1115,28 @@ function generateMeowVariations(message, count) {
     const emoticonProbability = calculateEmoticonProbability(sentimentData);
     
     const catSoundsWithContext = [];
+    
+    // Check if it's night time using client's local time (or fallback to server time)
+    const isCurrentlyNightTime = clientTime ? isNightTimeForClient(clientTime) : isNightTime();
+    const hasExplicitSleepWords = text.includes('tired') || text.includes('sleep') || text.includes('nap');
+    const shouldBeSleepy = hasExplicitSleepWords || (isCurrentlyNightTime && Math.random() < 0.25); // 25% chance at night
+    
+    // Log time information for debugging
+    if (clientTime) {
+        Logger.debug(`[TIME] Using client time for sleepy detection`, {
+            clientHour: clientTime.hour,
+            clientTimezone: clientTime.timezone,
+            isNightTime: isCurrentlyNightTime,
+            shouldBeSleepy: shouldBeSleepy,
+            hasExplicitSleepWords: hasExplicitSleepWords
+        });
+    } else {
+        Logger.debug(`[TIME] Using server time for sleepy detection (client time not provided)`, {
+            serverHour: new Date().getHours(),
+            isNightTime: isCurrentlyNightTime,
+            shouldBeSleepy: shouldBeSleepy
+        });
+    }
     
     // Expanded variety of cat sounds with different emotional contexts
     // Removed most punctuation from individual sounds - will be added at sentence level
@@ -979,8 +1161,13 @@ function generateMeowVariations(message, count) {
         let soundType = standardSounds;
         let context = 'standard';
         
-        // PRIMARY: Use sentiment analysis to determine cat behavior
-        if (sentimentData.sentiment === 'negative') {
+        // Check for forced sleepy mode first (once per message decision)
+        if (shouldBeSleepy && Math.random() < 0.6) { // 60% of sounds will be sleepy when in sleepy mode
+            soundType = sleepyTiredSounds;
+            context = 'sleepy';
+        } else {
+            // PRIMARY: Use sentiment analysis to determine cat behavior
+            if (sentimentData.sentiment === 'negative') {
             // Negative sentiment handling based on intensity
             if (sentimentData.intensity === 'extreme') {
                 // Extremely negative - hostile and defensive
@@ -1023,7 +1210,7 @@ function generateMeowVariations(message, count) {
             if (text.includes('?') && Math.random() < 0.4) {
                 soundType = Math.random() < 0.5 ? questionSounds : curiousSounds;
                 context = Math.random() < 0.5 ? 'question' : 'curious';
-            } else if ((text.includes('tired') || text.includes('sleep') || text.includes('nap') || isNightTime()) && Math.random() < 0.1) {
+            } else if ((text.includes('tired') || text.includes('sleep') || text.includes('nap')) && Math.random() < 0.4) {
                 soundType = sleepyTiredSounds;
                 context = 'sleepy';
             } else if ((text.includes('food') || text.includes('hungry') || text.includes('treat') || text.includes('feed')) && Math.random() < 0.4) {
@@ -1035,6 +1222,7 @@ function generateMeowVariations(message, count) {
                 soundType = neutralVariety;
                 context = 'playful';
             }
+        }
         }
         
         // Select random sound from the chosen type
@@ -1174,6 +1362,12 @@ function isNightTime() {
     return hour >= 22 || hour <= 5;
 }
 
+function isNightTimeForClient(clientTime) {
+    // Use client's local hour for more accurate night-time detection
+    const clientHour = clientTime.hour;
+    return clientHour >= 22 || clientHour <= 5;
+}
+
 function generateWelcomeMeows() {
     // Generate 5-7 welcome meows using only standard, question, and excited sounds
     const welcomeCount = Math.floor(Math.random() * 3) + 5; // 5-7 meows
@@ -1239,7 +1433,7 @@ io.on('connection', (socket) => {
     
     socket.on('send-message', async (data) => {
         const messageStartTime = Date.now();
-        const { message, conversationId } = data;
+        const { message, conversationId, clientTime } = data;
         
         serverStats.totalMessages++;
         
@@ -1247,7 +1441,12 @@ io.on('connection', (socket) => {
             conversationId,
             messagePreview: message.length > 50 ? message.substring(0, 50) + '...' : message,
             messageLength: message.length,
-            totalMessages: serverStats.totalMessages
+            totalMessages: serverStats.totalMessages,
+            clientTime: clientTime ? {
+                hour: clientTime.hour,
+                timezone: clientTime.timezone,
+                localTime: clientTime.timestamp
+            } : 'not provided'
         });
         
         // Store user message
@@ -1282,7 +1481,7 @@ io.on('connection', (socket) => {
         
         // Generate contextual cat sound response based on user input
         const generationStartTime = Date.now();
-        const catSentences = generateMeowVariations(message, complexity);
+        const catSentences = generateMeowResponse(message, clientTime);
         const generationDuration = Date.now() - generationStartTime;
         
         // Split sentences into individual words for streaming
