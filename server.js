@@ -1541,7 +1541,7 @@ server.listen(PORT, () => {
     Logger.info(`Platform: ${process.platform} ${process.arch}`);
     Logger.info(`Memory usage:`, process.memoryUsage());
     Logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    Logger.info(`🐱 CatGPT server ready to meow! 🐱`);
+    Logger.info(`CatGPT server ready to go!`);
     
     // Log server stats every 5 minutes
     setInterval(() => {
