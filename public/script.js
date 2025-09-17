@@ -159,7 +159,14 @@ function updateAIMessage(content, isStreaming) {
     if (isStreaming) {
         messageContent.innerHTML = `${escapeHtml(content)}<span class="streaming-cursor"></span>`;
     } else {
-        messageContent.innerHTML = escapeHtml(content);
+        messageContent.innerHTML = `
+            <div class="message-text">${escapeHtml(content)}</div>
+            <div class="message-actions">
+                <button class="speak-button" onclick="speakMessage('${escapeHtml(content).replace(/'/g, "\\'")}', this)" title="Speak it with cat sounds!">
+                    <i class="fas fa-volume-up"></i>
+                </button>
+            </div>
+        `;
         currentMessage.id = ''; // Remove the ID as it's no longer the current message
     }
     
@@ -236,7 +243,12 @@ function displayCompletedAIMessage(content) {
             <img src="images/catgpt-avatar.png" alt="CatGPT" class="avatar-gif">
         </div>
         <div class="message-content">
-            ${escapeHtml(content)}
+            <div class="message-text">${escapeHtml(content)}</div>
+            <div class="message-actions">
+                <button class="speak-button" onclick="speakMessage('${escapeHtml(content).replace(/'/g, "\\'")}', this)" title="Speak it with cat sounds!">
+                    <i class="fas fa-volume-up"></i>
+                </button>
+            </div>
         </div>
     `;
     
@@ -348,3 +360,302 @@ socket.on('connect', () => {
 
 // Initialize
 console.log('🐱 CatGPT initialized! Ready to meow at your service!');
+
+// Audio Library and "Speak It" Feature
+let audioLibrary = null;
+let currentAudioPlayback = null;
+
+// Load audio library configuration
+async function loadAudioLibrary() {
+    try {
+        const response = await fetch('/audio/audio-library.json');
+        audioLibrary = await response.json();
+        console.log('🔊 Audio library loaded!', audioLibrary);
+    } catch (error) {
+        console.warn('⚠️ Could not load audio library:', error);
+        audioLibrary = null;
+    }
+}
+
+// Get any random sound from all available sounds for simplified playback
+function getAnyRandomSound(excludeSound = null, recentSounds = []) {
+    if (!audioLibrary || !audioLibrary.emotions) {
+        return null;
+    }
+    
+    // Collect all sounds from all emotions
+    const allSounds = [];
+    Object.values(audioLibrary.emotions).forEach(emotion => {
+        if (emotion.sounds) {
+            allSounds.push(...emotion.sounds);
+        }
+    });
+    
+    if (allSounds.length === 0) return null;
+    
+    // Filter out recently used sounds for variety
+    let availableSounds = allSounds.filter(sound => 
+        sound !== excludeSound && 
+        !recentSounds.includes(sound)
+    );
+    
+    // If no sounds available after filtering, use all except the last one
+    if (availableSounds.length === 0) {
+        availableSounds = allSounds.filter(sound => sound !== excludeSound);
+    }
+    
+    // If still no sounds, fall back to all sounds
+    if (availableSounds.length === 0) {
+        availableSounds = allSounds;
+    }
+    
+    return availableSounds[Math.floor(Math.random() * availableSounds.length)];
+}
+
+// Create audio sequence from text with any sounds (simplified)
+function createAudioSequence(text) {
+    const words = text.trim().split(/\s+/);
+    const sequence = [];
+    const recentSounds = []; // Track last 5 sounds to avoid repetition
+    const maxRecentSounds = 5;
+    
+    // Calculate target number of sounds based on message length - more sounds for longer messages
+    let targetSounds;
+    if (words.length <= 3) {
+        targetSounds = Math.max(2, words.length); // 2-3 sounds for very short messages
+    } else if (words.length <= 8) {
+        targetSounds = Math.ceil(words.length * 0.7); // ~70% of words for short messages
+    } else if (words.length <= 15) {
+        targetSounds = Math.ceil(words.length * 0.5); // ~50% of words for medium messages
+    } else if (words.length <= 25) {
+        targetSounds = Math.ceil(words.length * 0.4); // ~40% of words for long messages
+    } else {
+        targetSounds = Math.ceil(words.length * 0.3); // ~30% of words for very long messages
+    }
+    
+    // Ensure reasonable bounds (minimum 2, maximum 20 sounds)
+    targetSounds = Math.max(2, Math.min(20, targetSounds));
+    
+    // Calculate how often to place sounds evenly throughout the message
+    const soundInterval = Math.max(1, Math.floor(words.length / targetSounds));
+    
+    // Create sounds at calculated intervals
+    for (let i = 0; i < words.length && sequence.length < targetSounds; i += soundInterval) {
+        const lastSound = sequence.length > 0 ? sequence[sequence.length - 1].file.replace('/audio/', '') : null;
+        const soundFile = getAnyRandomSound(lastSound, recentSounds);
+        
+        if (soundFile) {
+            sequence.push({
+                file: `/audio/${soundFile}`,
+                word: words[i],
+                emotion: 'any' // No specific emotion needed
+            });
+            
+            // Track recent sounds for variety
+            recentSounds.push(soundFile);
+            if (recentSounds.length > maxRecentSounds) {
+                recentSounds.shift(); // Remove oldest sound
+            }
+        }
+    }
+    
+    // If we haven't reached our target, add more sounds
+    while (sequence.length < targetSounds) {
+        const lastSound = sequence.length > 0 ? sequence[sequence.length - 1].file.replace('/audio/', '') : null;
+        const soundFile = getAnyRandomSound(lastSound, recentSounds);
+        
+        if (soundFile) {
+            sequence.push({
+                file: `/audio/${soundFile}`,
+                word: '(additional)',
+                emotion: 'any'
+            });
+            
+            recentSounds.push(soundFile);
+            if (recentSounds.length > maxRecentSounds) {
+                recentSounds.shift();
+            }
+        } else {
+            break; // No more sounds available
+        }
+    }
+    
+    console.log(`📏 Message: ${words.length} words → ${sequence.length} sounds (target: ${targetSounds})`);
+    return sequence;
+}
+
+// Play audio sequence with smooth transitions
+async function playAudioSequence(sequence, button) {
+    if (!sequence || sequence.length === 0) {
+        console.warn('No audio sequence to play');
+        return;
+    }
+    
+    // Update button state
+    button.innerHTML = '<i class="fas fa-stop"></i>';
+    button.disabled = true;
+    button.classList.add('playing');
+    
+    try {
+        currentAudioPlayback = {
+            sequence: sequence,
+            button: button,
+            currentIndex: 0,
+            isPlaying: true
+        };
+        
+        for (let i = 0; i < sequence.length; i++) {
+            if (!currentAudioPlayback || !currentAudioPlayback.isPlaying) {
+                break;
+            }
+            
+            const audioItem = sequence[i];
+            currentAudioPlayback.currentIndex = i;
+            
+            try {
+                await playAudioFileSmooth(audioItem.file, i === 0, i === sequence.length - 1);
+                // Varied delay between sounds for more natural rhythm
+                const delay = 150 + Math.random() * 100; // 150-250ms delay
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } catch (error) {
+                console.warn(`Could not play ${audioItem.file}:`, error);
+                // Continue with next sound
+            }
+        }
+    } catch (error) {
+        console.error('Error playing audio sequence:', error);
+    } finally {
+        // Reset button state
+        if (button) {
+            button.innerHTML = '<i class="fas fa-volume-up"></i>';
+            button.disabled = false;
+            button.classList.remove('playing');
+        }
+        currentAudioPlayback = null;
+    }
+}
+
+// Play individual audio file with smooth fade effects
+function playAudioFileSmooth(src, isFirst = false, isLast = false) {
+    return new Promise((resolve, reject) => {
+        const audio = new Audio(src);
+        
+        // Set initial volume for fade-in effect
+        audio.volume = isFirst ? 0 : 0.3;
+        
+        audio.addEventListener('error', () => {
+            reject(new Error(`Failed to load audio: ${src}`));
+        });
+        
+        audio.addEventListener('canplaythrough', () => {
+            audio.play().then(() => {
+                // Fade in effect
+                if (isFirst) {
+                    fadeIn(audio, 0.8, 200); // Quick fade-in for first sound
+                } else {
+                    fadeIn(audio, 0.8, 100); // Subtle fade-in for subsequent sounds
+                }
+                
+                // Set up fade out before the sound ends
+                audio.addEventListener('timeupdate', function fadeOutHandler() {
+                    const timeLeft = audio.duration - audio.currentTime;
+                    
+                    // Start fade out in the last 150ms (or 100ms for short sounds)
+                    const fadeTime = audio.duration < 1 ? 100 : 150;
+                    
+                    if (timeLeft <= fadeTime / 1000 && !isLast) {
+                        audio.removeEventListener('timeupdate', fadeOutHandler);
+                        fadeOut(audio, 0.3, fadeTime); // Fade to 30% volume instead of 0
+                    } else if (timeLeft <= fadeTime / 1000 && isLast) {
+                        audio.removeEventListener('timeupdate', fadeOutHandler);
+                        fadeOut(audio, 0, fadeTime); // Complete fade out for last sound
+                    }
+                });
+                
+                audio.addEventListener('ended', resolve);
+            }).catch(reject);
+        });
+        
+        // Start loading
+        audio.load();
+    });
+}
+
+// Smooth fade in function
+function fadeIn(audio, targetVolume, duration) {
+    const startVolume = audio.volume;
+    const volumeStep = (targetVolume - startVolume) / (duration / 10);
+    
+    const fadeInterval = setInterval(() => {
+        if (audio.volume + volumeStep >= targetVolume) {
+            audio.volume = targetVolume;
+            clearInterval(fadeInterval);
+        } else {
+            audio.volume += volumeStep;
+        }
+    }, 10);
+}
+
+// Smooth fade out function
+function fadeOut(audio, targetVolume, duration) {
+    const startVolume = audio.volume;
+    const volumeStep = (startVolume - targetVolume) / (duration / 10);
+    
+    const fadeInterval = setInterval(() => {
+        if (audio.volume - volumeStep <= targetVolume) {
+            audio.volume = targetVolume;
+            clearInterval(fadeInterval);
+        } else {
+            audio.volume -= volumeStep;
+        }
+    }, 10);
+}
+
+// Legacy function for compatibility (now just calls the smooth version)
+function playAudioFile(src) {
+    return playAudioFileSmooth(src, true, true);
+}
+
+// Main speak function called by buttons
+async function speakMessage(text, button) {
+    if (!audioLibrary) {
+        console.warn('Audio library not loaded');
+        return;
+    }
+    
+    // Stop current playback if running
+    if (currentAudioPlayback && currentAudioPlayback.isPlaying) {
+        stopCurrentPlayback();
+        return;
+    }
+    
+    const sequence = createAudioSequence(text);
+    
+    if (sequence.length === 0) {
+        console.warn('No audio sequence could be created for text:', text);
+        return;
+    }
+    
+    console.log('🔊 Playing audio sequence:', sequence);
+    await playAudioSequence(sequence, button);
+}
+
+// Stop current audio playback
+function stopCurrentPlayback() {
+    if (currentAudioPlayback) {
+        currentAudioPlayback.isPlaying = false;
+        
+        if (currentAudioPlayback.button) {
+            currentAudioPlayback.button.innerHTML = '<i class="fas fa-volume-up"></i>';
+            currentAudioPlayback.button.disabled = false;
+            currentAudioPlayback.button.classList.remove('playing');
+        }
+        
+        currentAudioPlayback = null;
+    }
+}
+
+// Load audio library when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    loadAudioLibrary();
+});
